@@ -1,10 +1,3 @@
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Text;
-using System.Threading.Tasks;
 using SoulsFormats;
 
 namespace DS2_Scrambler
@@ -46,13 +39,13 @@ namespace DS2_Scrambler
         public Random rand;
         public Regulation regulation;
         public ScramblerData Data;
-
         public ParamScrambler(Random random, Regulation reg, ScramblerData scramblerData)
         {
             Data = scramblerData;
             rand = random;
             regulation = reg;
         }
+
 
         public int GetRandomInt(double min, double max)
         {
@@ -135,6 +128,7 @@ namespace DS2_Scrambler
             List<PARAM.Row> ArrowParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ArrowParam")).ToList()[0].Rows;
             List<PARAM.Row> WeaponTypeParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"WeaponTypeParam")).ToList()[0].Rows;
             List<PARAM.Row> WeaponActionCategoryParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"WeaponActionCategoryParam")).ToList()[0].Rows;
+            StreamWriter sw = new StreamWriter("weapons.txt");
 
             if (c_ItemParam_Weapon_Price)
             {
@@ -142,11 +136,20 @@ namespace DS2_Scrambler
                 row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
                 row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End
                 ).ToList();
-
+                sw.WriteLine("!!!   WEAPON_PRICES:   !!!");
                 foreach (PARAM.Row row in rows)
                 {
-                    row["base_price"].Value = GetRandomInt(ScramblerData_Params.Static.WeaponParamData.Base_Price_Min, ScramblerData_Params.Static.WeaponParamData.Base_Price_Max);
-                    row["sell_price"].Value = GetRandomInt(ScramblerData_Params.Static.WeaponParamData.Sell_Price_Min, ScramblerData_Params.Static.WeaponParamData.Sell_Price_Max);
+                    sw.WriteLine("\n\n" + "Row ID:" + row.ID);
+
+                    sw.WriteLine("Default base: " + row["base_price"].Value);
+                    var price = (int)row["base_price"].Value * rand.Next(65, 150) / 100;
+                    row["base_price"].Value = price;
+
+                    price = (int)row["sell_price"].Value * rand.Next(65, 150) / 100;
+                    sw.WriteLine("Default sale:" + row["sell_price"].Value);
+                    sw.WriteLine("Random base price:" + (int)row["base_price"].Value);
+                    row["sell_price"].Value = price;
+                    sw.WriteLine("Random sell price:" + row["sell_price"].Value);
                 }
             }
             if (c_ItemParam_Weapon_Effect)
@@ -228,7 +231,12 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    row["weight"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Weight_Min, ScramblerData_Params.Static.WeaponParamData.Weight_Max);
+                    sw.WriteLine("!!! WEIGHT !!!!");
+                    sw.WriteLine(row.ID);
+                    var weight = (Single)row["weight"].Value * rand.Next(65, 150) / 100;
+                    sw.WriteLine("Original weight: " + row["weight"].Value);
+                    sw.WriteLine("New weight:" + weight);
+                    row["weight"].Value = weight;
                 }
             }
             if (c_WeaponParam_Weapon_Durability)
@@ -241,7 +249,11 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    row["max_durability"].Value = (float)GetRandomInt(ScramblerData_Params.Static.WeaponParamData.Durability_Min, ScramblerData_Params.Static.WeaponParamData.Durability_Max);
+                    sw.WriteLine("!!! Durability! !!!");
+                    var max_durability = (Single)row["max_durability"].Value * rand.Next(65, 150) / 100;
+                    sw.WriteLine("ID: " + row.ID + "\nDefault:" + row["max_durability"].Value + "New: ");
+                    row["max_durability"].Value = max_durability;
+                    Console.Write(row["max_durability"].Value);
                 }
             }
             if (c_ItemParam_Weapon_Animation_Speed)
@@ -253,7 +265,10 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    row["animation_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Animation_Speed_Min, ScramblerData_Params.Static.WeaponParamData.Animation_Speed_Max);
+                    sw.WriteLine("ID: " + row.ID + " Default aspd: " + row["animation_speed"].Value);
+                    var animationspeed = (Single)row["animation_speed"].Value * rand.Next(65, 150) / 100;
+                    row["animation_speed"].Value = animationspeed;
+                    sw.WriteLine("New speed: " + (Single)row["animation_speed"].Value);
                 }
             }
             if (c_WeaponParam_StatRequirements)
@@ -264,12 +279,19 @@ namespace DS2_Scrambler
                     !ScramblerData_Items.Static.Category_Fists.Contains(row.ID)
                 ).ToList();
 
+                string[] reqs = { "str_requirement", "dex_requirement", "int_requirement", "fth_requirement" };
                 foreach (PARAM.Row row in rows)
                 {
-                    row["str_requirement"].Value = GetRandomShort(ScramblerData_Params.Static.WeaponParamData.STR_Requirement_Min, ScramblerData_Params.Static.WeaponParamData.STR_Requirement_Max);
-                    row["dex_requirement"].Value = GetRandomShort(ScramblerData_Params.Static.WeaponParamData.DEX_Requirement_Min, ScramblerData_Params.Static.WeaponParamData.DEX_Requirement_Max);
-                    row["int_requirement"].Value = GetRandomShort(ScramblerData_Params.Static.WeaponParamData.INT_Requirement_Min, ScramblerData_Params.Static.WeaponParamData.INT_Requirement_Max);
-                    row["fth_requirement"].Value = GetRandomShort(ScramblerData_Params.Static.WeaponParamData.FTH_Requirement_Min, ScramblerData_Params.Static.WeaponParamData.FTH_Requirement_Max);
+                    foreach (string s in reqs)
+                    {
+                        sw.WriteLine(row.ID + ": ");
+                        sw.WriteLine("Starting " + s + ": " + row[s].Value);
+                        var requirement = (Int16)row[s].Value * (rand.Next(80, 130)) / 100;
+                        sw.WriteLine("Required stat: " + s + ": " + requirement);
+                        row[s].Value = requirement;
+                        sw.WriteLine(s + ": " + row[s].Value);
+                        sw.WriteLine("\n");
+                    }
                 }
             }
             if (c_WeaponParam_Damage)
@@ -280,18 +302,17 @@ namespace DS2_Scrambler
                     !ScramblerData_Items.Static.Category_Fists.Contains(row.ID)
                 ).ToList();
 
+                string[] damage = { "stamina_damage", "damage_mult", "stamina_damage_mult", "durability_damage_mult", "status_effect_amount", "posture_damage_mult", "hitback_radius", "hitback_length" };
+
                 foreach (PARAM.Row row in rows)
                 {
-                    row["stamina_damage"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Stamina_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Stamina_Damage_Max);
-                    row["damage_mult"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Damage_Multiplier_Max);
-                    row["stamina_damage_mult"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Stamina_Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Stamina_Damage_Multiplier_Max);
-                    row["durability_damage_mult"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Durability_Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Durability_Damage_Multiplier_Max);
-
-                    // Only apply if the weapon already uses it
-                    if ((float)row["status_effect_amount"].Value > 0)
-                        row["status_effect_amount"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Status_Inflict_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Status_Inflict_Multiplier_Max);
-
-                    row["posture_damage_mult"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Posture_Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Posture_Damage_Multiplier_Max);
+                    foreach (string s in damage)
+                    {
+                        sw.WriteLine(row.ID + " initial values for :" + s + ": " + row[s].Value);
+                        var dmg = (Single)row[s].Value * rand.Next(65, 150) / 100;
+                        row[s].Value = dmg;
+                        sw.WriteLine(row.ID + " final values:" + row[s].Value);
+                    }
                 }
 
                 // WeaponTypeParam
@@ -299,7 +320,10 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    row["counter_damage"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Counter_Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Counter_Damage_Multiplier_Max);
+                    sw.WriteLine("Initial counter damage: " + row.ID + "\n:" + row["counter_damage"].Value);
+                    var counterdamage = (Single)row["counter_damage"].Value * rand.Next(50, 150) / 100;
+                    row["counter_damage"].Value = counterdamage;
+                    sw.WriteLine("Final counter damage: " + row["counter_damage"].Value);
                 }
             }
             if (c_WeaponReinforceParam_Reinforcement)
@@ -309,82 +333,49 @@ namespace DS2_Scrambler
                 foreach (PARAM.Row row in rows)
                 {
                     // Damage
-                    var base_physical = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Physical_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Physical_Damage_Max);
-                    var base_magic = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Magic_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Magic_Damage_Max);
-                    var base_lightning = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Lightning_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Lightning_Damage_Max);
-                    var base_fire = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Fire_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Fire_Damage_Max);
-                    var base_dark = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Dark_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Dark_Damage_Max);
-                    var base_poison = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Poison_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Poison_Damage_Max);
-                    var base_bleed = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Bleed_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Bleed_Damage_Max);
 
-                    var growth = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Damage_Growth_Min, ScramblerData_Params.Static.WeaponParamData.Damage_Growth_Max);
+                    sw.WriteLine("Row ID" + row.ID);
+                    string[] damage = { "damage_physical", "damage_magic", "damage_lightning", "damage_dark", "damage_fire", "damage_poison", "damage_bleed" };
+                    foreach (string s in damage)
+                    {
 
-                    row["damage_physical"].Value = base_physical;
-                    row["damage_magic"].Value = base_magic;
-                    row["damage_lightning"].Value = base_lightning;
-                    row["damage_fire"].Value = base_fire;
-                    row["damage_dark"].Value = base_dark;
-                    row["damage_poison"].Value = base_poison;
-                    row["damage_bleed"].Value = base_bleed;
+                        float growth = GetRandomFloat(1.0, 2.5);
+                        sw.WriteLine("Random growth: " + growth);
+                        sw.WriteLine(s + " default: " + row[s].Value);
+                        sw.WriteLine(s + " default max: " + row["max_" + s].Value);
+                        if (rand.Next(0, 5) >= 4)
+                        {
+                            if (Convert.ToSingle(row[s].Value) == 0)
+                            {
+                                sw.WriteLine("Random achieved, adding 1-200 damage to a formerly empty stat.");
+                                row[s].Value = (Single)rand.Next(1, 200);
+                                sw.WriteLine("New value for " + s + ": " + row[s].Value);
+                            }
+                        }
+                        var value = (Single)row[s].Value * (rand.Next(70, 130) / 100);
+                        row[s].Value = value;
+                        sw.WriteLine("New value for " + s + ":");
+                        row["max_" + s].Value = value * growth;
+                        sw.WriteLine("New value for " + "max_" + s + ": " + row["max_" + s].Value);
+                    }
 
-                    row["max_damage_physical"].Value = (int)(base_physical * growth);
-                    row["max_damage_magic"].Value = (int)(base_magic * growth);
-                    row["max_damage_lightning"].Value = (int)(base_lightning * growth);
-                    row["max_damage_fire"].Value = (int)(base_fire * growth);
-                    row["max_damage_dark"].Value = (int)(base_dark * growth);
-                    row["max_damage_poison"].Value = (int)(base_poison * growth);
-                    row["max_damage_bleed"].Value = (int)(base_bleed * growth);
-
-                    var stability = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Shield_Stability_Min, ScramblerData_Params.Static.WeaponParamData.Shield_Stability_Max);
-                    var stability_factor = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Shield_Stability_Growth_Min, ScramblerData_Params.Static.WeaponParamData.Shield_Stability_Growth_Max);
+                    var stability = Convert.ToSingle(row["stability_0"].Value);
+                    sw.WriteLine("Original stability" + stability);
 
                     // Shields
                     if (row.ID >= 11000)
                     {
                         row["stability_0"].Value = stability;
-                        row["stability_1"].Value = (stability * (stability_factor * 1));
-                        row["stability_2"].Value = (stability * (stability_factor * 2));
-                        row["stability_3"].Value = (stability * (stability_factor * 3));
-                        row["stability_4"].Value = (stability * (stability_factor * 4));
-                        row["stability_5"].Value = (stability * (stability_factor * 5));
-                        row["stability_6"].Value = (stability * (stability_factor * 6));
-                        row["stability_7"].Value = (stability * (stability_factor * 7));
-                        row["stability_8"].Value = (stability * (stability_factor * 8));
-                        row["stability_9"].Value = (stability * (stability_factor * 9));
-                        row["stability_10"].Value = (stability * (stability_factor * 10));
-
-                        if ((float)row["stability_0"].Value > 100)
-                            row["stability_0"].Value = 100;
-
-                        if ((float)row["stability_1"].Value > 100)
-                            row["stability_1"].Value = 100;
-
-                        if ((float)row["stability_2"].Value > 100)
-                            row["stability_2"].Value = 100;
-
-                        if ((float)row["stability_3"].Value > 100)
-                            row["stability_3"].Value = 100;
-
-                        if ((float)row["stability_4"].Value > 100)
-                            row["stability_4"].Value = 100;
-
-                        if ((float)row["stability_5"].Value > 100)
-                            row["stability_5"].Value = 100;
-
-                        if ((float)row["stability_6"].Value > 100)
-                            row["stability_6"].Value = 100;
-
-                        if ((float)row["stability_7"].Value > 100)
-                            row["stability_7"].Value = 100;
-
-                        if ((float)row["stability_8"].Value > 100)
-                            row["stability_8"].Value = 100;
-
-                        if ((float)row["stability_9"].Value > 100)
-                            row["stability_9"].Value = 100;
-
-                        if ((float)row["stability_10"].Value > 100)
-                            row["stability_10"].Value = 100;
+                        for (int i = 1; i < 10; i++)
+                        {
+                            sw.WriteLine("Original stability_" + i + ":" + row["stability_" + i].Value);
+                            row["stability_" + i].Value = (stability * rand.Next(95, 120) / 100 * i);
+                            if ((float)row["stability_" + i].Value > 100)
+                            {
+                                row["stability_" + i].Value = 100;
+                            }
+                            sw.WriteLine("New stability_" + i + ":" + row["stability_" + i].Value);
+                        }
                     }
                     else
                     {
@@ -401,31 +392,20 @@ namespace DS2_Scrambler
                         row["stability_10"].Value = stability;
                     }
 
-                    // Absorption
-                    var base_abs_physical = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Physical_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Physical_Absorption_Max);
-                    var base_abs_magic = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Magic_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Magic_Absorption_Max);
-                    var base_abs_lightning = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Lightning_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Lightning_Absorption_Max);
-                    var base_abs_fire = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Fire_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Fire_Absorption_Max);
-                    var base_abs_dark = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Dark_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Dark_Absorption_Max);
-                    var base_abs_poison = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Poison_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Poison_Absorption_Max);
-                    var base_abs_bleed = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Bleed_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Bleed_Absorption_Max);
-                    var base_abs_curse = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Curse_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Curse_Absorption_Max);
-                    var base_abs_petrify = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Petrify_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Petrify_Absorption_Max);
+                    string[] base_abs = { "absorption_physical", "absorption_magic", "absorption_lightning", "absorption_dark", "absorption_poison", "absorption_bleed", "absorption_petrify", "absorption_curse" };
 
-                    var factor = 1.0;
+                    //this is softcoded but it only has one variable and doesn't change
+                    var factor = 1.2;
 
+                    foreach (string s in base_abs)
+                    {
+                        sw.WriteLine("Original absorption for " + s + ": " + row[s].Value);
+                        var absorp = (Single)row[s].Value * rand.Next(60, 140) / 100;
+                        row[s].Value = absorp;
+                        sw.WriteLine("Final absorption for " + s + ": " + row[s].Value);
+                    }
                     if (row.ID >= 11000)
                         factor = ScramblerData_Params.Static.WeaponParamData.Shield_Absorption_Factor;
-
-                    row["absorption_physical"].Value = (base_abs_physical * factor);
-                    row["absorption_magic"].Value = (base_abs_magic * factor);
-                    row["absorption_fire"].Value = (base_abs_fire * factor);
-                    row["absorption_lightning"].Value = (base_abs_lightning * factor);
-                    row["absorption_dark"].Value = (base_abs_dark * factor);
-                    row["absorption_poison"].Value = (base_abs_poison * factor);
-                    row["absorption_bleed"].Value = (base_abs_bleed * factor);
-                    row["absorption_petrify"].Value = (base_abs_curse * factor);
-                    row["absorption_curse"].Value = (base_abs_petrify * factor);
                 }
             }
             if (c_WeaponParam_StaminaConsumption)
@@ -465,7 +445,7 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    if((ushort)row["damage_physical"].Value > 0)
+                    if ((ushort)row["damage_physical"].Value > 0)
                         row["damage_physical"].Value = GetRandomUShort(ScramblerData_Params.Static.WeaponParamData.Arrow_Physical_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Arrow_Physical_Damage_Max);
 
                     if ((ushort)row["damage_magic"].Value > 0)
@@ -501,7 +481,7 @@ namespace DS2_Scrambler
             }
 
             // Tweaks
-            if(c_Tweak_WeaponParam_RemoveStatRequirements)
+            if (c_Tweak_WeaponParam_RemoveStatRequirements)
             {
                 List<PARAM.Row> rows = WeaponParam.Where(row =>
                     row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
@@ -517,7 +497,7 @@ namespace DS2_Scrambler
                     row["fth_requirement"].Value = 0;
                 }
             }
-
+            sw.Close();
             return regulation;
         }
 
@@ -565,18 +545,28 @@ namespace DS2_Scrambler
             List<PARAM.Row> ItemParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ItemParam")).ToList()[0].Rows;
             List<PARAM.Row> ArmorParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ArmorParam")).ToList()[0].Rows;
             List<PARAM.Row> ArmorReinforceParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ArmorReinforceParam")).ToList()[0].Rows;
-
-            if(c_ItemParam_Armor_Price)
+            StreamWriter sw = new StreamWriter("armor.txt");
+            if (c_ItemParam_Armor_Price)
             {
                 List<PARAM.Row> rows = ItemParam.Where(row =>
                row.ID >= ScramblerData_Items.Static.ArmorParam_Category_Start &&
                row.ID <= ScramblerData_Items.Static.ArmorParam_Category_End
                ).ToList();
 
+                sw.WriteLine("!!!   ARMOR_PRICES:   !!!");
                 foreach (PARAM.Row row in rows)
                 {
-                    row["base_price"].Value = GetRandomInt(ScramblerData_Params.Static.ArmorParamData.Base_Price_Min, ScramblerData_Params.Static.ArmorParamData.Base_Price_Max);
-                    row["sell_price"].Value = GetRandomInt(ScramblerData_Params.Static.ArmorParamData.Sell_Price_Min, ScramblerData_Params.Static.ArmorParamData.Sell_Price_Max);
+                    sw.WriteLine("\n\n" + "Row ID:" + row.ID);
+
+                    sw.WriteLine("Default base: " + row["base_price"].Value);
+                    var price = (int)row["base_price"].Value * rand.Next(65, 150) / 100;
+                    row["base_price"].Value = price;
+
+                    price = (int)row["sell_price"].Value * rand.Next(65, 150) / 100;
+                    sw.WriteLine("Default sale:" + row["sell_price"].Value);
+                    sw.WriteLine("Random base price:" + (int)row["base_price"].Value);
+                    row["sell_price"].Value = price;
+                    sw.WriteLine("Random sell price:" + row["sell_price"].Value);
                 }
             }
             if (c_ItemParam_Armor_Effect)
@@ -650,14 +640,19 @@ namespace DS2_Scrambler
             }
             if (c_ArmorParam_Armor_Weight)
             {
-                List<PARAM.Row> rows = ArmorParam.Where(row => 
-                row.ID >= 11010100 && 
+                List<PARAM.Row> rows = ArmorParam.Where(row =>
+                row.ID >= 11010100 &&
                 row.ID <= 1715950103
                 ).ToList();
 
                 foreach (PARAM.Row row in rows)
                 {
-                    row["weight"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Weight_Min, ScramblerData_Params.Static.ArmorParamData.Weight_Max);
+                    sw.WriteLine("!!! WEIGHT !!!!");
+                    sw.WriteLine(row.ID);
+                    var weight = (Single)row["weight"].Value * rand.Next(65, 150) / 100;
+                    sw.WriteLine("Original weight: " + row["weight"].Value);
+                    sw.WriteLine("New weight:" + weight);
+                    row["weight"].Value = weight;
                 }
             }
             if (c_ArmorParam_Armor_Durability)
@@ -669,7 +664,11 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    row["durability"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Durability_Min, ScramblerData_Params.Static.ArmorParamData.Durability_Max);
+                    sw.WriteLine("!!! Durability! !!!");
+                    var durability = (Single)row["durability"].Value * rand.Next(65, 150) / 100;
+                    sw.WriteLine("ID: " + row.ID + "\nDefault:" + row["durability"].Value);
+                    row["durability"].Value = durability;
+                    Console.WriteLine("Final:" + row["durability"].Value);
                 }
             }
             if (c_ArmorParam_Defence)
@@ -681,10 +680,10 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    row["physical_defence_scaling"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Physical_Defence_Scaling_Min, ScramblerData_Params.Static.ArmorParamData.Physical_Defence_Scaling_Max);
-                    row["Unk11"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Unk11_Min, ScramblerData_Params.Static.ArmorParamData.Unk11_Max);
-                    row["Unk12"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Unk12_Min, ScramblerData_Params.Static.ArmorParamData.Unk12_Max);
-                    row["Unk13"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Unk13_Min, ScramblerData_Params.Static.ArmorParamData.Unk13_Max);
+                    sw.WriteLine("Original armor scaling:" + row["physical_defence_scaling"].Value);
+                    var physdefscale = (Single)row["physical_defence_scaling"].Value * rand.Next(25, 500) / 100;
+                    row["physical_defence_scaling"].Value = physdefscale;
+                    sw.WriteLine("New armor scaling:" + row["physical_defence_scaling"].Value);
                 }
             }
             if (c_ArmorParam_StatRequirements)
@@ -694,14 +693,22 @@ namespace DS2_Scrambler
                 row.ID <= 17950103
                 ).ToList();
 
+                string[] reqs = { "strength_requirement", "dexterity_requirement", "intelligence_requirement", "faith_requirement" };
                 foreach (PARAM.Row row in rows)
                 {
-                    row["strength_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.ArmorParamData.STR_Requirement_Min, ScramblerData_Params.Static.ArmorParamData.STR_Requirement_Max);
-                    row["dexterity_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.ArmorParamData.DEX_Requirement_Min, ScramblerData_Params.Static.ArmorParamData.DEX_Requirement_Max);
-                    row["intelligence_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.ArmorParamData.INT_Requirement_Min, ScramblerData_Params.Static.ArmorParamData.INT_Requirement_Max);
-                    row["faith_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.ArmorParamData.FTH_Requirement_Min, ScramblerData_Params.Static.ArmorParamData.FTH_Requirement_Max);
+                    foreach (string s in reqs)
+                    {
+                        sw.WriteLine(row.ID + ": ");
+                        sw.WriteLine("Starting " + s + ": " + row[s].Value);
+                        var requirement = (Int16)row[s].Value * (rand.Next(80, 130)) / 100;
+                        sw.WriteLine("Required stat: " + s + ": " + requirement);
+                        row[s].Value = requirement;
+                        sw.WriteLine(s + ": " + row[s].Value);
+                        sw.WriteLine("\n");
+                    }
                 }
             }
+
             if (c_ArmorParam_Poise)
             {
                 List<PARAM.Row> rows = ArmorParam.Where(row =>
@@ -711,9 +718,15 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    row["poise"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Poise_Min, ScramblerData_Params.Static.ArmorParamData.Poise_Max);
+                    sw.WriteLine("!!! Poise !!!!");
+                    sw.WriteLine(row.ID);
+                    var weight = (Single)row["poise"].Value * rand.Next(65, 150) / 100;
+                    sw.WriteLine("Original poise: " + row["poise"].Value);
+                    row["poise"].Value = weight;
+                    sw.WriteLine("New poise: " + row["poise"].Value);
                 }
             }
+
             if (c_ArmorReinforceParam_Absorption)
             {
                 List<PARAM.Row> rows = ArmorReinforceParam.Where(row =>
@@ -724,52 +737,34 @@ namespace DS2_Scrambler
                 foreach (PARAM.Row row in rows)
                 {
                     // Defence
-                    var base_slash = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Slash_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Slash_Absorption_Max);
-                    var base_thrust = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Thrust_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Thrust_Absorption_Max);
-                    var base_strike = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Strike_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Strike_Absorption_Max);
-                    var base_standard = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Standard_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Standard_Absorption_Max);
-
-                    var base_magic = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Magic_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Magic_Absorption_Max);
-                    var base_lightning = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Lightning_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Lightning_Absorption_Max);
-                    var base_fire = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Fire_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Fire_Absorption_Max);
-                    var base_dark = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Dark_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Dark_Absorption_Max);
-
-                    var base_poison = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Poison_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Poison_Absorption_Max);
-                    var base_bleed = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Bleed_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Bleed_Absorption_Max);
-                    var base_petrify = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Petrify_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Petrify_Absorption_Max);
-                    var base_curse = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Curse_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Curse_Absorption_Max);
-
                     var growth = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Absorption_Growth_Min, ScramblerData_Params.Static.ArmorParamData.Absorption_Growth_Max);
 
-                    row["defence_slash"].Value = base_slash;
-                    row["defence_thrust"].Value = base_thrust;
-                    row["defence_strike"].Value = base_strike;
-                    row["defence_standard"].Value = base_standard;
+                    string[] defence = { "_slash", "_thrust", "_strike", "_standard" };
+                    string[] absorp = { "_poison", "_petrify", "_bleed", "_curse", "_magic", "_fire", "_dark", "_lightning" };
+                    foreach (string s in defence)
+                    {
+                        sw.WriteLine(s);
+                        sw.WriteLine("Original value:" + row["defence" + s].Value);
+                        var tempvar = (Single)row["defence" + s].Value * rand.Next(90, 150) / 100;
+                        row["defence" + s].Value = tempvar;
+                        sw.WriteLine("New value:" + row["defence" + s].Value);
+                        sw.WriteLine("Original max value:" + row["max_defence" + s].Value);
+                        row["max_defence" + s].Value = tempvar * rand.Next(120, 200) / 100;
+                        sw.WriteLine("New max value:" + row["max_defence" + s].Value);
+                    }
 
-                    row["absorption_magic"].Value = base_magic;
-                    row["absorption_lightning"].Value = base_lightning;
-                    row["absorption_fire"].Value = base_fire;
-                    row["absorption_dark"].Value = base_dark;
+                    foreach (string s in absorp)
+                    {
+                        sw.WriteLine(s);
+                        sw.WriteLine("Original value:" + row["absorption" + s].Value);
+                        var tempvar = (Single)row["absorption" + s].Value * rand.Next(90, 150) / 100;
+                        row["absorption" + s].Value = tempvar;
+                        sw.WriteLine("New value:" + row["absorption" + s].Value);
+                        sw.WriteLine("Original max value:" + row["max_absorption" + s].Value);
+                        row["max_absorption" + s].Value = tempvar * rand.Next(120, 200) / 100;
+                        sw.WriteLine("New max value:" + row["max_absorption" + s].Value);
 
-                    row["absorption_poison"].Value = base_poison;
-                    row["absorption_bleed"].Value = base_bleed;
-                    row["absorption_petrify"].Value = base_petrify;
-                    row["absorption_curse"].Value = base_curse;
-
-                    row["max_defence_slash"].Value = (int)(base_slash * growth);
-                    row["max_defence_thrust"].Value = (int)(base_thrust * growth);
-                    row["max_defence_strike"].Value = (int)(base_strike * growth);
-                    row["max_defence_standard"].Value = (int)(base_standard * growth);
-
-                    row["max_absorption_magic"].Value = (int)(base_magic * growth);
-                    row["max_absorption_lightning"].Value = (int)(base_lightning * growth);
-                    row["max_absorption_fire"].Value = (int)(base_fire * growth);
-                    row["max_absorption_dark"].Value = (int)(base_dark * growth);
-
-                    row["max_absorption_poison"].Value = (int)(base_poison * growth);
-                    row["max_absorption_bleed"].Value = (int)(base_bleed * growth);
-                    row["max_absorption_petrify"].Value = (int)(base_petrify * growth);
-                    row["max_absorption_curse"].Value = (int)(base_curse * growth);
+                    }
                 }
             }
 
@@ -789,7 +784,7 @@ namespace DS2_Scrambler
                     row["faith_requirement"].Value = 0;
                 }
             }
-
+            sw.Close();
             return regulation;
         }
 
@@ -955,7 +950,7 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    if((ushort)row["max_held_count"].Value > 1)
+                    if ((ushort)row["max_held_count"].Value > 1)
                         row["max_held_count"].Value = GetRandomUShort(ScramblerData_Params.Static.ItemParamData.Hold_Count_Min, ScramblerData_Params.Static.ItemParamData.Hold_Count_Max);
                 }
             }
@@ -1029,7 +1024,7 @@ namespace DS2_Scrambler
 
                     if (ScramblerData_Params.Static.ItemParamData.Force_Homeward_Item_Effects == 1)
                     {
-                        if(row.ID == 60350000)
+                        if (row.ID == 60350000)
                         {
                             row["speffect_id"].Value = 60350000;
                         }
@@ -1248,7 +1243,7 @@ namespace DS2_Scrambler
             List<PARAM.Row> EnemyBulletParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"EnemyBulletParam")).ToList()[0].Rows;
             List<PARAM.Row> SystemBulletParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"SystemBulletParam")).ToList()[0].Rows;
 
-            if(c_Bullet_IncludePlayer)
+            if (c_Bullet_IncludePlayer)
             {
                 List<PARAM.Row> rows = BulletParam;
 
@@ -1331,7 +1326,7 @@ namespace DS2_Scrambler
                     row["expire_sfx_id"].Value = ScramblerData_Core.Static.FFX_List[rand.Next(ScramblerData_Core.Static.FFX_List.Count)];
                 }
             }
-            if(c_Bullet_Movement)
+            if (c_Bullet_Movement)
             {
                 foreach (PARAM.Row row in rows)
                 {
@@ -1353,7 +1348,7 @@ namespace DS2_Scrambler
                     row["tan_horizontal_max_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Tan_Horizontal_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Tan_Horizontal_Velocity_Max);
                 }
             }
-            if(c_Bullet_Angle)
+            if (c_Bullet_Angle)
             {
                 foreach (PARAM.Row row in rows)
                 {
@@ -1367,7 +1362,7 @@ namespace DS2_Scrambler
                     row["horizontal_spread"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Horizontal_Spread_Min, ScramblerData_Params.Static.ProjectileParamData.Horizontal_Spread_Max);
                 }
             }
-            if(c_Bullet_SpawnDistance)
+            if (c_Bullet_SpawnDistance)
             {
                 foreach (PARAM.Row row in rows)
                 {
@@ -1376,14 +1371,14 @@ namespace DS2_Scrambler
                     row["horizontal_spawn_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Horizontal_Spawn_Distance_Min, ScramblerData_Params.Static.ProjectileParamData.Horizontal_Spawn_Distance_Max);
                 }
             }
-            if(c_Bullet_Duration)
+            if (c_Bullet_Duration)
             {
                 foreach (PARAM.Row row in rows)
                 {
                     row["max_life"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Life_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Life_Max);
                 }
             }
-            if(c_Bullet_Tracking)
+            if (c_Bullet_Tracking)
             {
                 foreach (PARAM.Row row in rows)
                 {
@@ -1392,7 +1387,7 @@ namespace DS2_Scrambler
                     row["max_tracking_time"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Tracking_Time_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Tracking_Time_Max);
                 }
             }
-            if(c_Bullet_Effect)
+            if (c_Bullet_Effect)
             {
                 List<int> list = new List<int>();
 
@@ -1496,7 +1491,9 @@ namespace DS2_Scrambler
             List<PARAM.Row> LockOnParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"LockOnParam")).ToList()[0].Rows;
             List<PARAM.Row> ChrMoveParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ChrMoveParam")).ToList()[0].Rows;
 
-            if(c_PlayerStatusParam_StartingAttributes)
+
+
+            if (c_PlayerStatusParam_StartingAttributes)
             {
                 List<PARAM.Row> rows = PlayerStatusParam.Where(row => row.ID >= 20 && row.ID <= 100).ToList();
 
@@ -1544,7 +1541,7 @@ namespace DS2_Scrambler
             {
                 List<PARAM.Row> rows = EventCommonParam.Where(row => row.ID == 14).ToList();
 
-                foreach(PARAM.Row row in rows)
+                foreach (PARAM.Row row in rows)
                 {
                     row["event_value"].Value = GetRandomInt(ScramblerData_Params.Static.PlayerParamData.Shrine_of_Winter_Unlock_Amount_Min, ScramblerData_Params.Static.PlayerParamData.Shrine_of_Winter_Unlock_Amount_Max);
                 }
@@ -1819,6 +1816,8 @@ namespace DS2_Scrambler
         public bool usesBolts = false;
         public bool setFirstSpell = false;
 
+        public int ScramblerData_Params_LowScale { get; private set; }
+
         public void RandomiseClassEquipment(PARAM.Row row, bool allowAnyEquipment)
         {
             ushort attunement = (ushort)row["attunement"].Value;
@@ -1902,7 +1901,7 @@ namespace DS2_Scrambler
                 // Conver the ArmorParam ID to ItemParam ID if required
                 string raw_id = armorList[rand.Next(armorList.Count)].ID.ToString();
 
-                if(raw_id.Substring(0, 1) == "1")
+                if (raw_id.Substring(0, 1) == "1")
                 {
                     string new_id = raw_id.Substring(1);
                     raw_id = $"2{new_id}";
@@ -1999,7 +1998,7 @@ namespace DS2_Scrambler
                     usesHexes = true;
                 }
                 // Fallback
-                else if(valid_melee_weapons.Count > 0)
+                else if (valid_melee_weapons.Count > 0)
                 {
                     row[slot].Value = valid_melee_weapons[rand.Next(valid_melee_weapons.Count)].ID;
                 }
@@ -2424,11 +2423,11 @@ namespace DS2_Scrambler
                 EnemyDamageParam = EnemyDamageParam.Where(row => !IsDamageParamMatch(row.ID.ToString(), ScramblerData_Core.Static.Character_EnemyParamID_List)).ToList();
                 LogicComParam = LogicComParam.Where(row => !IsLogicComParamMatch(row.ID.ToString(), ScramblerData_Core.Static.Character_EnemyParamID_List)).ToList();
             }
-            if(!c_Enemy_IncludeSummons)
+            if (!c_Enemy_IncludeSummons)
             {
                 EnemyParam = EnemyParam.Where(row => !ScramblerData_Core.Static.Summon_Character_EnemyParamID_List.Contains(row.ID)).ToList();
             }
-            if(!c_Enemy_IncludeHostileCharacters)
+            if (!c_Enemy_IncludeHostileCharacters)
             {
                 EnemyParam = EnemyParam.Where(row => !ScramblerData_Core.Static.Hostile_Character_EnemyParamID_List.Contains(row.ID)).ToList();
             }
@@ -2436,7 +2435,7 @@ namespace DS2_Scrambler
             // Only apply these if a group is actually included
             if (c_LogicComParam_Detection)
             {
-                foreach(PARAM.Row row in LogicComParam)
+                foreach (PARAM.Row row in LogicComParam)
                 {
                     row["sight_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.AI_Sight_Distance_Min, ScramblerData_Params.Static.EnemyParamData.AI_Sight_Distance_Max);
                     row["detect_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.AI_Detect_Distance_Min, ScramblerData_Params.Static.EnemyParamData.AI_Detect_Distance_Max);
