@@ -1,1505 +1,2767 @@
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
 using SoulsFormats;
 
 namespace DS2_Scrambler
 {
-    public class ItemScrambler
+    // Credit to TKGP for these extensions.
+    static class Extensions
+    {
+        public static T GetRandom<T>(this List<T> list, Random rand)
+        {
+            return list[rand.Next(list.Count)];
+        }
+
+        public static T PopRandom<T>(this List<T> list, Random rand)
+        {
+            int index = rand.Next(list.Count);
+            T result = list[index];
+            list.RemoveAt(index);
+            return result;
+        }
+
+        public static void Shuffle<T>(this IList<T> list, Random rand)
+        {
+            int n = list.Count;
+            while (n > 1)
+            {
+                n--;
+                int k = rand.Next(n + 1);
+                T value = list[k];
+                list[k] = list[n];
+                list[n] = value;
+            }
+        }
+    }
+
+    // TODO: add new scramble type: Scalar, that scales the existing value instead of generating a new value. This will be a selection box in actions. Existing will be called Generated
+
+    public class ParamScrambler
     {
         public Random rand;
         public Regulation regulation;
         public ScramblerData Data;
 
-        public bool T_Ignore_Keys = false;
-        public bool T_Ignore_Tools = false;
-        public bool T_Include_Boss_Treasure = false;
-        public bool T_Include_Character_Treasure = false;
-        public bool T_Include_Covenant_Treasure = false;
-        public bool T_Include_Bird_Treasure = false;
-        public bool T_Include_Event_Treasure = false;
-        public bool T_Ensure_Lifegems = false;
-        public bool T_Retain_Shop_Spread = false;
-
-        public List<PARAM.Row> Unassigned_Weapons;
-        public List<PARAM.Row> Unassigned_Armor;
-        public List<PARAM.Row> Unassigned_Spells;
-        public List<PARAM.Row> Unassigned_Rings;
-
-        public List<PARAM.Row> Assigned_Itemlots;
-
-        // TODO: add cheat-sheet generation so important items can be peeked at - At minimum this should pinpoint keys
-
-        public ItemScrambler(Random random, Regulation reg, ScramblerData scramblerData)
+        public ParamScrambler(Random random, Regulation reg, ScramblerData scramblerData)
         {
             Data = scramblerData;
             rand = random;
             regulation = reg;
-
-            Unassigned_Weapons = new List<PARAM.Row>(Data.Row_List_Weapons);
-            Unassigned_Armor = new List<PARAM.Row>(Data.Row_List_Armor);
-            Unassigned_Spells = new List<PARAM.Row>(Data.Row_List_Spells);
-            Unassigned_Rings = new List<PARAM.Row>(Data.Row_List_Rings);
-
-            Assigned_Itemlots = new List<PARAM.Row>();
         }
 
-        public Regulation Scramble_Loot(bool scrambleLoot, bool scrambleEnemyDrops, bool scrambleShops, bool scrambleBossTrades, bool includeBossTreasure, bool includeCharacterTreasure, bool includeCovenantTreasure, bool includeBirdTreasure, bool includeEventTreasure, bool ignoreKeys, bool ignoreTools, bool ensureLifegems, bool retainShopSpread)
+        public int GetRandomInt(double min, double max)
         {
-            T_Ignore_Keys = ignoreKeys;
-            T_Ignore_Tools = ignoreTools;
-            T_Include_Boss_Treasure = includeBossTreasure;
-            T_Include_Character_Treasure = includeCharacterTreasure;
-            T_Include_Covenant_Treasure = includeCovenantTreasure;
-            T_Include_Bird_Treasure = includeBirdTreasure;
-            T_Include_Event_Treasure = includeEventTreasure;
-            T_Ensure_Lifegems = ensureLifegems;
-            T_Retain_Shop_Spread = retainShopSpread;
+            double random_value = SimpleRNG.GetUniform();
+            double result = (max * random_value) < min ? min : (max * random_value);
 
-            if (scrambleLoot)
+            return (int)result;
+        }
+
+        public uint GetRandomUInt(double min, double max)
+        {
+            double random_value = SimpleRNG.GetUniform();
+            double result = (max * random_value) < min ? min : (max * random_value);
+
+            return (uint)result;
+        }
+
+        public short GetRandomShort(double min, double max)
+        {
+            double random_value = SimpleRNG.GetUniform();
+            double result = (max * random_value) < min ? min : (max * random_value);
+
+            return (short)result;
+        }
+
+        public ushort GetRandomUShort(double min, double max)
+        {
+            double random_value = SimpleRNG.GetUniform();
+            double result = (max * random_value) < min ? min : (max * random_value);
+
+            return (ushort)result;
+        }
+
+        public byte GetRandomByte(double min, double max)
+        {
+            double random_value = SimpleRNG.GetUniform();
+            double result = (max * random_value) < min ? min : (max * random_value);
+
+            return (byte)result;
+        }
+
+        public sbyte GetRandomSByte(double min, double max)
+        {
+            double random_value = SimpleRNG.GetUniform();
+            double result = (max * random_value) < min ? min : (max * random_value);
+
+            return (sbyte)result;
+        }
+
+        public float GetRandomFloat(double min, double max)
+        {
+            double random_value = SimpleRNG.GetUniform();
+            double result = (max * random_value) < min ? min : (max * random_value);
+
+            return (float)result;
+        }
+
+        public Regulation Scramble_WeaponAttributes(
+            bool c_ItemParam_Weapon_Price,
+            bool c_ItemParam_Weapon_Effect,
+            bool c_WeaponParam_Weapon_Weight,
+            bool c_WeaponParam_Weapon_Durability,
+            bool c_ItemParam_Weapon_Animation_Speed,
+            bool c_WeaponParam_StatRequirements,
+            bool c_WeaponParam_Damage,
+            bool c_WeaponReinforceParam_Reinforcement,
+            bool c_WeaponParam_StaminaConsumption,
+            bool c_WeaponTypeParam_CastSpeed,
+            bool c_WeaponTypeParam_BowDistance,
+            bool c_ArrowParam_AmmoDamage,
+            bool c_WeaponActionCategoryParam_Moveset,
+            bool c_Tweak_WeaponParam_RemoveStatRequirements
+        )
+        {
+            List<PARAM.Row> ItemParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ItemParam")).ToList()[0].Rows;
+            List<PARAM.Row> ArmorParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ArmorParam")).ToList()[0].Rows;
+            List<PARAM.Row> WeaponParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"WeaponParam")).ToList()[0].Rows;
+            List<PARAM.Row> RingParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"RingParam")).ToList()[0].Rows;
+            List<PARAM.Row> WeaponReinforceParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"WeaponReinforceParam")).ToList()[0].Rows;
+            List<PARAM.Row> ArrowParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ArrowParam")).ToList()[0].Rows;
+            List<PARAM.Row> WeaponTypeParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"WeaponTypeParam")).ToList()[0].Rows;
+            List<PARAM.Row> WeaponActionCategoryParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"WeaponActionCategoryParam")).ToList()[0].Rows;
+
+            if (c_ItemParam_Weapon_Price)
             {
-                Util.PrintLine("Item Scramble: Structured Loot");
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End
+                ).ToList();
 
-                if (!T_Ignore_Keys)
+                foreach (PARAM.Row row in rows)
                 {
-                    ScrambleKeyItems();
+                    row["base_price"].Value = GetRandomInt(ScramblerData_Params.Static.WeaponParamData.Base_Price_Min, ScramblerData_Params.Static.WeaponParamData.Base_Price_Max);
+                    row["sell_price"].Value = GetRandomInt(ScramblerData_Params.Static.WeaponParamData.Sell_Price_Min, ScramblerData_Params.Static.WeaponParamData.Sell_Price_Max);
                 }
+            }
+            if (c_ItemParam_Weapon_Effect)
+            {
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                    row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
+                    row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End
+                ).ToList();
 
-                if (!T_Ignore_Tools)
-                {
-                    ScrambleToolItems();
-                }
+                List<int> list = new List<int>();
 
-                Util.PrintLine("Item Scramble: Random Loot");
-
-                if (T_Include_Boss_Treasure)
+                if (ScramblerData_Params.Static.WeaponParamData.Include_Weapon_Effects == 1)
                 {
-                    ScrambleBossRewards(Data.Itemlot_List_Boss_Drops);
-                    ScrambleBossSoulItems();
+                    foreach (int entry in ScramblerData_Core.Static.Weapon_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
                 }
-                if (T_Include_Character_Treasure)
+                if (ScramblerData_Params.Static.WeaponParamData.Include_Armor_Effects == 1)
                 {
-                    ScrambleCharacterRewards(Data.Itemlot_List_NPC_Rewards);
+                    foreach (int entry in ScramblerData_Core.Static.Armor_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
                 }
-                if (T_Include_Covenant_Treasure)
+                if (ScramblerData_Params.Static.WeaponParamData.Include_Ring_Effects == 1)
                 {
-                    ScrambleCovenantRewards(Data.Itemlot_List_Covenant_Rewards);
+                    foreach (int entry in ScramblerData_Core.Static.Ring_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
                 }
-                if (T_Include_Bird_Treasure)
+                if (ScramblerData_Params.Static.WeaponParamData.Include_Item_Action_Effects == 1)
                 {
-                    ScrambleBirdRewards(Data.Itemlot_List_Bird_Rewards);
+                    foreach (int entry in ScramblerData_Core.Static.Item_Action_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
                 }
-                if (T_Include_Event_Treasure)
+                if (ScramblerData_Params.Static.WeaponParamData.Include_Item_Soul_Effects == 1)
                 {
-                    ScrambleEventRewards(Data.Itemlot_List_Event_Rewards);
+                    foreach (int entry in ScramblerData_Core.Static.Item_Soul_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
                 }
-
-                ScrambleMapLoot(Data.Itemlot_List_Things_Betwixt);
-                ScrambleMapLoot(Data.Itemlot_List_Majula);
-                ScrambleMapLoot(Data.Itemlot_List_Forest_of_Fallen_Giants);
-                ScrambleMapLoot(Data.Itemlot_List_Brightstone_Cove_Tseldora);
-                ScrambleMapLoot(Data.Itemlot_List_Aldias_Keep);
-                ScrambleMapLoot(Data.Itemlot_List_Lost_Bastille);
-                ScrambleMapLoot(Data.Itemlot_List_Earthen_Peak);
-                ScrambleMapLoot(Data.Itemlot_List_No_Mans_Wharf);
-                ScrambleMapLoot(Data.Itemlot_List_Iron_Keep);
-                ScrambleMapLoot(Data.Itemlot_List_Huntmans_Copse);
-                ScrambleMapLoot(Data.Itemlot_List_The_Gutter);
-                ScrambleMapLoot(Data.Itemlot_List_Dragon_Aerie);
-                ScrambleMapLoot(Data.Itemlot_List_Path_to_the_Shaded_Woods);
-                ScrambleMapLoot(Data.Itemlot_List_Unseen_Path_to_Heide);
-                ScrambleMapLoot(Data.Itemlot_List_Heides_Tower_of_Flame);
-                ScrambleMapLoot(Data.Itemlot_List_Shaded_Woods);
-                ScrambleMapLoot(Data.Itemlot_List_Doors_of_Pharros);
-                ScrambleMapLoot(Data.Itemlot_List_Grave_of_Saints);
-                ScrambleMapLoot(Data.Itemlot_List_Giants_Memory);
-                ScrambleMapLoot(Data.Itemlot_List_Shrine_of_Amana);
-                ScrambleMapLoot(Data.Itemlot_List_Drangleic_Castle);
-                ScrambleMapLoot(Data.Itemlot_List_Undead_Crypt);
-                ScrambleMapLoot(Data.Itemlot_List_Dragon_Memories);
-                ScrambleMapLoot(Data.Itemlot_List_Chasm_of_the_Abyss);
-                ScrambleMapLoot(Data.Itemlot_List_Shulva);
-                ScrambleMapLoot(Data.Itemlot_List_Brume_Tower);
-                ScrambleMapLoot(Data.Itemlot_List_Things_Betwixt);
-                ScrambleMapLoot(Data.Itemlot_List_Eleum_Loyce);
-
-                if (scrambleEnemyDrops)
+                if (ScramblerData_Params.Static.WeaponParamData.Include_Item_Warp_Effects == 1)
                 {
-                    ScrambleEnemyDrops(Data.ItemlotParam_Chr.Rows.Where(row => 
-                    row.ID >= ScramblerData_Items.Static.Enemy_Drop_Itemlot_Start && 
-                    row.ID <= ScramblerData_Items.Static.Enemy_Drop_Itemlot_End
-                    ).ToList());
+                    foreach (int entry in ScramblerData_Core.Static.Item_Warp_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.WeaponParamData.Include_Item_Misc_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Misc_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
                 }
 
-                if (scrambleShops)
+                foreach (PARAM.Row row in rows)
                 {
-                    ScrambleShops();
+                    if (list.Count > 0)
+                    {
+                        var result = list[rand.Next(list.Count)];
+
+                        row["speffect_id"].Value = result;
+                    }
+                }
+            }
+            if (c_WeaponParam_Weapon_Weight)
+            {
+                List<PARAM.Row> rows = WeaponParam.Where(row =>
+                    row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
+                    row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End &&
+                    !ScramblerData_Items.Static.Category_Fists.Contains(row.ID)
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["weight"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Weight_Min, ScramblerData_Params.Static.WeaponParamData.Weight_Max);
+                }
+            }
+            if (c_WeaponParam_Weapon_Durability)
+            {
+                List<PARAM.Row> rows = WeaponParam.Where(row =>
+                    row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
+                    row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End &&
+                    !ScramblerData_Items.Static.Category_Fists.Contains(row.ID)
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["max_durability"].Value = (float)GetRandomInt(ScramblerData_Params.Static.WeaponParamData.Durability_Min, ScramblerData_Params.Static.WeaponParamData.Durability_Max);
+                }
+            }
+            if (c_ItemParam_Weapon_Animation_Speed)
+            {
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["animation_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Animation_Speed_Min, ScramblerData_Params.Static.WeaponParamData.Animation_Speed_Max);
+                }
+            }
+            if (c_WeaponParam_StatRequirements)
+            {
+                List<PARAM.Row> rows = WeaponParam.Where(row =>
+                    row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
+                    row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End &&
+                    !ScramblerData_Items.Static.Category_Fists.Contains(row.ID)
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["str_requirement"].Value = GetRandomShort(ScramblerData_Params.Static.WeaponParamData.STR_Requirement_Min, ScramblerData_Params.Static.WeaponParamData.STR_Requirement_Max);
+                    row["dex_requirement"].Value = GetRandomShort(ScramblerData_Params.Static.WeaponParamData.DEX_Requirement_Min, ScramblerData_Params.Static.WeaponParamData.DEX_Requirement_Max);
+                    row["int_requirement"].Value = GetRandomShort(ScramblerData_Params.Static.WeaponParamData.INT_Requirement_Min, ScramblerData_Params.Static.WeaponParamData.INT_Requirement_Max);
+                    row["fth_requirement"].Value = GetRandomShort(ScramblerData_Params.Static.WeaponParamData.FTH_Requirement_Min, ScramblerData_Params.Static.WeaponParamData.FTH_Requirement_Max);
+                }
+            }
+            if (c_WeaponParam_Damage)
+            {
+                List<PARAM.Row> rows = WeaponParam.Where(row =>
+                    row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
+                    row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End &&
+                    !ScramblerData_Items.Static.Category_Fists.Contains(row.ID)
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["stamina_damage"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Stamina_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Stamina_Damage_Max);
+                    row["damage_mult"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Damage_Multiplier_Max);
+                    row["stamina_damage_mult"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Stamina_Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Stamina_Damage_Multiplier_Max);
+                    row["durability_damage_mult"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Durability_Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Durability_Damage_Multiplier_Max);
+
+                    // Only apply if the weapon already uses it
+                    if ((float)row["status_effect_amount"].Value > 0)
+                        row["status_effect_amount"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Status_Inflict_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Status_Inflict_Multiplier_Max);
+
+                    row["posture_damage_mult"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Posture_Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Posture_Damage_Multiplier_Max);
                 }
 
-                if (scrambleBossTrades)
+                // WeaponTypeParam
+                rows = WeaponTypeParam;
+
+                foreach (PARAM.Row row in rows)
                 {
-                    ScrambleBossSoulTrades();
+                    row["counter_damage"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Counter_Damage_Multiplier_Min, ScramblerData_Params.Static.WeaponParamData.Counter_Damage_Multiplier_Max);
+                }
+            }
+            if (c_WeaponReinforceParam_Reinforcement)
+            {
+                List<PARAM.Row> rows = WeaponReinforceParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    // Damage
+                    var base_physical = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Physical_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Physical_Damage_Max);
+                    var base_magic = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Magic_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Magic_Damage_Max);
+                    var base_lightning = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Lightning_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Lightning_Damage_Max);
+                    var base_fire = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Fire_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Fire_Damage_Max);
+                    var base_dark = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Dark_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Dark_Damage_Max);
+                    var base_poison = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Poison_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Poison_Damage_Max);
+                    var base_bleed = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Bleed_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Bleed_Damage_Max);
+
+                    var growth = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Damage_Growth_Min, ScramblerData_Params.Static.WeaponParamData.Damage_Growth_Max);
+
+                    row["damage_physical"].Value = base_physical;
+                    row["damage_magic"].Value = base_magic;
+                    row["damage_lightning"].Value = base_lightning;
+                    row["damage_fire"].Value = base_fire;
+                    row["damage_dark"].Value = base_dark;
+                    row["damage_poison"].Value = base_poison;
+                    row["damage_bleed"].Value = base_bleed;
+
+                    row["max_damage_physical"].Value = (int)(base_physical * growth);
+                    row["max_damage_magic"].Value = (int)(base_magic * growth);
+                    row["max_damage_lightning"].Value = (int)(base_lightning * growth);
+                    row["max_damage_fire"].Value = (int)(base_fire * growth);
+                    row["max_damage_dark"].Value = (int)(base_dark * growth);
+                    row["max_damage_poison"].Value = (int)(base_poison * growth);
+                    row["max_damage_bleed"].Value = (int)(base_bleed * growth);
+
+                    var stability = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Shield_Stability_Min, ScramblerData_Params.Static.WeaponParamData.Shield_Stability_Max);
+                    var stability_factor = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Shield_Stability_Growth_Min, ScramblerData_Params.Static.WeaponParamData.Shield_Stability_Growth_Max);
+
+                    // Shields
+                    if (row.ID >= 11000)
+                    {
+                        row["stability_0"].Value = stability;
+                        row["stability_1"].Value = (stability * (stability_factor * 1));
+                        row["stability_2"].Value = (stability * (stability_factor * 2));
+                        row["stability_3"].Value = (stability * (stability_factor * 3));
+                        row["stability_4"].Value = (stability * (stability_factor * 4));
+                        row["stability_5"].Value = (stability * (stability_factor * 5));
+                        row["stability_6"].Value = (stability * (stability_factor * 6));
+                        row["stability_7"].Value = (stability * (stability_factor * 7));
+                        row["stability_8"].Value = (stability * (stability_factor * 8));
+                        row["stability_9"].Value = (stability * (stability_factor * 9));
+                        row["stability_10"].Value = (stability * (stability_factor * 10));
+
+                        if ((float)row["stability_0"].Value > 100)
+                            row["stability_0"].Value = 100;
+
+                        if ((float)row["stability_1"].Value > 100)
+                            row["stability_1"].Value = 100;
+
+                        if ((float)row["stability_2"].Value > 100)
+                            row["stability_2"].Value = 100;
+
+                        if ((float)row["stability_3"].Value > 100)
+                            row["stability_3"].Value = 100;
+
+                        if ((float)row["stability_4"].Value > 100)
+                            row["stability_4"].Value = 100;
+
+                        if ((float)row["stability_5"].Value > 100)
+                            row["stability_5"].Value = 100;
+
+                        if ((float)row["stability_6"].Value > 100)
+                            row["stability_6"].Value = 100;
+
+                        if ((float)row["stability_7"].Value > 100)
+                            row["stability_7"].Value = 100;
+
+                        if ((float)row["stability_8"].Value > 100)
+                            row["stability_8"].Value = 100;
+
+                        if ((float)row["stability_9"].Value > 100)
+                            row["stability_9"].Value = 100;
+
+                        if ((float)row["stability_10"].Value > 100)
+                            row["stability_10"].Value = 100;
+                    }
+                    else
+                    {
+                        row["stability_0"].Value = stability;
+                        row["stability_1"].Value = stability;
+                        row["stability_2"].Value = stability;
+                        row["stability_3"].Value = stability;
+                        row["stability_4"].Value = stability;
+                        row["stability_5"].Value = stability;
+                        row["stability_6"].Value = stability;
+                        row["stability_7"].Value = stability;
+                        row["stability_8"].Value = stability;
+                        row["stability_9"].Value = stability;
+                        row["stability_10"].Value = stability;
+                    }
+
+                    // Absorption
+                    var base_abs_physical = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Physical_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Physical_Absorption_Max);
+                    var base_abs_magic = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Magic_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Magic_Absorption_Max);
+                    var base_abs_lightning = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Lightning_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Lightning_Absorption_Max);
+                    var base_abs_fire = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Fire_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Fire_Absorption_Max);
+                    var base_abs_dark = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Dark_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Dark_Absorption_Max);
+                    var base_abs_poison = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Poison_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Poison_Absorption_Max);
+                    var base_abs_bleed = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Bleed_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Bleed_Absorption_Max);
+                    var base_abs_curse = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Curse_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Curse_Absorption_Max);
+                    var base_abs_petrify = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Petrify_Absorption_Min, ScramblerData_Params.Static.WeaponParamData.Petrify_Absorption_Max);
+
+                    var factor = 1.0;
+
+                    if (row.ID >= 11000)
+                        factor = ScramblerData_Params.Static.WeaponParamData.Shield_Absorption_Factor;
+
+                    row["absorption_physical"].Value = (base_abs_physical * factor);
+                    row["absorption_magic"].Value = (base_abs_magic * factor);
+                    row["absorption_fire"].Value = (base_abs_fire * factor);
+                    row["absorption_lightning"].Value = (base_abs_lightning * factor);
+                    row["absorption_dark"].Value = (base_abs_dark * factor);
+                    row["absorption_poison"].Value = (base_abs_poison * factor);
+                    row["absorption_bleed"].Value = (base_abs_bleed * factor);
+                    row["absorption_petrify"].Value = (base_abs_curse * factor);
+                    row["absorption_curse"].Value = (base_abs_petrify * factor);
+                }
+            }
+            if (c_WeaponParam_StaminaConsumption)
+            {
+                List<PARAM.Row> rows = WeaponParam.Where(row =>
+                    row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
+                    row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End &&
+                    !ScramblerData_Items.Static.Category_Fists.Contains(row.ID)
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["stamina_consumption"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Stamina_Consumption_Min, ScramblerData_Params.Static.WeaponParamData.Stamina_Consumption_Max);
+                }
+            }
+            if (c_WeaponTypeParam_CastSpeed)
+            {
+                List<PARAM.Row> rows = WeaponTypeParam.Where(row => row.ID >= 300 && row.ID <= 358).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["cast_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.WeaponParamData.Cast_Speed_Min, ScramblerData_Params.Static.WeaponParamData.Cast_Speed_Max);
+                }
+            }
+            if (c_WeaponTypeParam_BowDistance)
+            {
+                List<PARAM.Row> rows = WeaponTypeParam.Where(row => row.ID >= 360 && row.ID <= 386).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["bow_distance"].Value = GetRandomUShort(ScramblerData_Params.Static.WeaponParamData.Bow_Distance_Min, ScramblerData_Params.Static.WeaponParamData.Bow_Distance_Max);
+                }
+            }
+            if (c_ArrowParam_AmmoDamage)
+            {
+                List<PARAM.Row> rows = ArrowParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    if((ushort)row["damage_physical"].Value > 0)
+                        row["damage_physical"].Value = GetRandomUShort(ScramblerData_Params.Static.WeaponParamData.Arrow_Physical_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Arrow_Physical_Damage_Max);
+
+                    if ((ushort)row["damage_magic"].Value > 0)
+                        row["damage_magic"].Value = GetRandomUShort(ScramblerData_Params.Static.WeaponParamData.Arrow_Magic_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Arrow_Magic_Damage_Max);
+
+                    if ((ushort)row["damage_lightning"].Value > 0)
+                        row["damage_lightning"].Value = GetRandomUShort(ScramblerData_Params.Static.WeaponParamData.Arrow_Lightning_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Arrow_Lightning_Damage_Max);
+
+                    if ((ushort)row["damage_fire"].Value > 0)
+                        row["damage_fire"].Value = GetRandomUShort(ScramblerData_Params.Static.WeaponParamData.Arrow_Fire_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Arrow_Fire_Damage_Max);
+
+                    if ((ushort)row["damage_dark"].Value > 0)
+                        row["damage_dark"].Value = GetRandomUShort(ScramblerData_Params.Static.WeaponParamData.Arrow_Dark_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Arrow_Dark_Damage_Max);
+
+                    if ((byte)row["damage_poison"].Value > 0)
+                        row["damage_poison"].Value = GetRandomByte(ScramblerData_Params.Static.WeaponParamData.Arrow_Poison_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Arrow_Poison_Damage_Max);
+
+                    if ((byte)row["damage_bleed"].Value > 0)
+                        row["damage_bleed"].Value = GetRandomByte(ScramblerData_Params.Static.WeaponParamData.Arrow_Bleed_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Arrow_Bleed_Damage_Max);
+                }
+            }
+            if (c_WeaponActionCategoryParam_Moveset)
+            {
+                List<PARAM.Row> rows = WeaponActionCategoryParam;
+
+                // This assigns new values based on the range of values within the existing fields.
+                // This is due to the fact that the movesets require similar moves in each slot.
+                // Failure to do this causes weird issues to occur.
+                foreach (string value in ScramblerData_Core.Static.WeaponActionCategoryFields)
+                {
+                    AssignRandomMoveset(value, rows);
+                }
+            }
+
+            // Tweaks
+            if(c_Tweak_WeaponParam_RemoveStatRequirements)
+            {
+                List<PARAM.Row> rows = WeaponParam.Where(row =>
+                    row.ID >= ScramblerData_Items.Static.WeaponParam_Category_Start &&
+                    row.ID <= ScramblerData_Items.Static.WeaponParam_Category_End &&
+                    !ScramblerData_Items.Static.Category_Fists.Contains(row.ID)
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["str_requirement"].Value = 0;
+                    row["dex_requirement"].Value = 0;
+                    row["int_requirement"].Value = 0;
+                    row["fth_requirement"].Value = 0;
                 }
             }
 
             return regulation;
         }
 
-        public void ScrambleKeyItems()
+        public void AssignRandomMoveset(string field, List<PARAM.Row> rows)
         {
-            // Soldier Key
-            if (T_Include_Event_Treasure || T_Include_Boss_Treasure) // Only include this if Boss/Event Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Soldier_Key.ID
-                ).ToList(), Data.Row_List_Soldier_Key, 0, 1);
-            }
+            List<uint> new_list = new List<uint>();
 
-            // Dull Ember
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Dull_Ember.ID
-            ).ToList(), Data.Row_List_Dull_Ember, 0, 1);
-
-            // Aldia Key
-            if (T_Include_Event_Treasure) // Only include this if Event Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Aldia_Key.ID
-                ).ToList(), Data.Row_List_Aldia_Key, 0, 1);
-            }
-
-            // Ashen Mist Heart
-            if (T_Include_Event_Treasure || T_Include_Character_Treasure) // Only include this if Character/Event Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Ashen_Mist_Heart.ID
-                ).ToList(), Data.Row_List_Ashen_Mist_Heart, 0, 1);
-            }
-
-            // Giant's Kinship
-            if (T_Include_Event_Treasure || T_Include_Boss_Treasure) // Only include this if Boss/Event Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Giants_Kinship.ID
-                ).ToList(), Data.Row_List_Giants_Kinship, 0, 1);
-            }
-
-            // Rotunda Lockstone
-            if (T_Include_Event_Treasure) // Only include this if Event Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Rotunda_Lockstone.ID
-                ).ToList(), Data.Row_List_Rotunda_Lockstone, 0, 1);
-            }
-
-            // Lenigrasts Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Lenigrasts_Key.ID
-            ).ToList(), Data.Row_List_Lenigrasts_Key, 0, 1);
-
-            // House Key
-            if (T_Include_Character_Treasure) // Only include this if Character Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.House_Key.ID
-                ).ToList(), Data.Row_List_House_Key, 0, 1);
-            }
-
-            // Antiquated Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Antiquated_Key.ID
-            ).ToList(), Data.Row_List_Antiquated_Key, 0, 1);
-
-            // Brightstone Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Brightstone_Key.ID
-            ).ToList(), Data.Row_List_Brightstone_Key, 0, 1);
-
-            // Bastille Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Bastille_Key.ID
-            ).ToList(), Data.Row_List_Bastille_Key, 0, 1);
-
-            // Tseldora Den Key
-            if (T_Include_Character_Treasure) // Only include this if Character Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Tseldora_Den_Key.ID
-                ).ToList(), Data.Row_List_Tseldora_Den_Key, 0, 1);
-            }
-
-            // Fang Key
-            if (T_Include_Event_Treasure) // Only include this if Event Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Fang_Key.ID
-                ).ToList(), Data.Row_List_Fang_Key, 0, 1);
-            }
-
-            // Iron Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Iron_Key.ID
-            ).ToList(), Data.Row_List_Iron_Key, 0, 1);
-
-            // Forgotten Key
-            if (T_Include_Event_Treasure) // Only include this if Event Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Forgotten_Key.ID
-                ).ToList(), Data.Row_List_Forgotten_Key, 0, 1);
-            }
-
-            // Key to the Kings Passage
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Key_to_the_Kings_Passage.ID
-            ).ToList(), Data.Row_List_Key_to_the_Kings_Passage, 0, 1);
-
-            // Undead Lockaway Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Undead_Lockaway_Key.ID
-            ).ToList(), Data.Row_List_Undead_Lockaway_Key, 0, 1);
-
-            // Eternal Sanctum Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Eternal_Sanctum_Key.ID
-            ).ToList(), Data.Row_List_Eternal_Sanctum_Key, 0, 1);
-
-            // Dragon Stone
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Dragon_Stone.ID
-            ).ToList(), Data.Row_List_Dragon_Stone, 0, 1);
-
-            // Scorching Iron Scepter
-            if (T_Include_Event_Treasure) // Only include this if Event Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Scorching_Iron_Scepter.ID
-                ).ToList(), Data.Row_List_Scorching_Iron_Scepter, 0, 1);
-            }
-
-            // Tower Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Tower_Key.ID
-            ).ToList(), Data.Row_List_Tower_Key, 0, 1);
-
-            // Garrison Ward Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Garrison_Ward_Key.ID
-            ).ToList(), Data.Row_List_Garrison_Ward_Key, 0, 1);
-
-            // Dragon Talon
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Dragon_Talon.ID
-            ).ToList(), Data.Row_List_Dragon_Talon, 0, 1);
-
-            // Heavy Iron Key
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Heavy_Iron_Key.ID
-            ).ToList(), Data.Row_List_Heavy_Iron_Key, 0, 1);
-
-            // Frozen Flower
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.Frozen_Flower.ID
-            ).ToList(), Data.Row_List_Frozen_Flower, 0, 1);
-
-            // Key to the Embedded
-            if (T_Include_Boss_Treasure) // Only include this if Boss Treasure is randomised
-            {
-                AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Key_to_the_Embedded.ID
-                ).ToList(), Data.Row_List_Key_to_the_Embedded, 0, 1);
-            }
-
-            // King Ring
-            AssignKeyToItemlot(Data.ItemParam.Rows.Where(row =>
-            row.ID == ScramblerData_Items.Static.King_Ring.ID
-            ).ToList(), Data.Row_List_King_Ring, 0, 1);
-        }
-
-        public void AssignKeyToItemlot(List<PARAM.Row> item, List<PARAM.Row> rows, int slot, int amount)
-        {
-            if(rows.Count < 1)
-            {
-                Util.PrintLine("AssignKeyToItemlot: passed rows is empty.");
-                return;
-            }
-
-            Random rand = new Random();
-            bool can_assign = false;
-
-            int index = 0;
-
-            // Only use the itemlot if it has not been previously used
-            while (!can_assign)
-            {
-                index = rand.Next(rows.Count);
-
-                PARAM.Row chosen_row = rows[index];
-
-                // Do not assign if the itemlot has already been used, or it has a never-change item in it.
-                if (!Assigned_Itemlots.Contains(chosen_row) &&
-                    !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, chosen_row)
-                )
-                    can_assign = true;
-            }
-
-            Util.PrintLine($"Assign Key itemlot: {item[0].ID}");
-
-            // Add the item to the itemlot
-            rows[index][$"item_lot_{slot}"].Value = item[0].ID;
-            rows[index][$"amount_lot_{slot}"].Value = amount;
-
-            // Add the itemlot to the assigned list
-            Assigned_Itemlots.Add(rows[index]);
-        }
-
-        public void ScrambleToolItems()
-        {
-            // Aged Feather
-            if (T_Include_Character_Treasure) // Only include this if Character Treasure is randomised
-            {
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Aged_Feather.ID
-                ).ToList(), Data.Row_List_Aged_Feather, 0, 1);
-            }
-
-            // Champion's Tablet
-            if (T_Include_Covenant_Treasure) // Only include this if Covenant Treasure is randomised
-            {
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Champion_Tablet.ID
-                ).ToList(), Data.Row_List_Champion_Tablet, 0, 1);
-            }
-
-            // Dragon Head Stone
-            if (T_Include_Covenant_Treasure) // Only include this if Covenant Treasure is randomised
-            {
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Dragon_Head_Stone.ID
-                ).ToList(), Data.Row_List_Dragon_Head_Stone, 0, 1);
-            }
-
-            // Dragon Torso Stone
-            if (T_Include_Covenant_Treasure) // Only include this if Covenant Treasure is randomised
-            {
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Dragon_Torso_Stone.ID
-                ).ToList(), Data.Row_List_Dragon_Torso_Stone, 0, 1);
-            }
-
-            // Hello Carving
-            if (T_Include_Covenant_Treasure) // Only include this if Covenant Treasure is randomised
-            {
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Hello_Carving.ID
-                ).ToList(), Data.Row_List_Hello_Carving, 0, 1);
-            }
-
-            // Thank You Carving
-            if (T_Include_Covenant_Treasure) // Only include this if Covenant Treasure is randomised
-            {
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Thank_You_Carving.ID
-                ).ToList(), Data.Row_List_Thank_You_Carving, 0, 1);
-            }
-
-            // I'm Sorry Carving
-            if (T_Include_Covenant_Treasure) // Only include this if Covenant Treasure is randomised
-            {
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Im_Sorry_Carving.ID
-                ).ToList(), Data.Row_List_Im_Sorry_Carving, 0, 1);
-            }
-
-            // Very Good! Carving
-            if (T_Include_Covenant_Treasure) // Only include this if Covenant Treasure is randomised
-            {
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row =>
-                row.ID == ScramblerData_Items.Static.Very_Good_Carving.ID
-                ).ToList(), Data.Row_List_Very_Good_Carving, 0, 1);
-            }
-
-            // Pharros' Lockstone
-            foreach (string map in ScramblerData_Items.Static.Pharros_Lockstone.Maps)
-            {
-                if (Data.map_itemlots.ContainsKey(map))
-                {
-                    List<PARAM.Row> rows = Data.map_itemlots[map];
-
-                    AssignToolToItemlot(Data.ItemParam.Rows.Where(row => 
-                    row.ID == ScramblerData_Items.Static.Pharros_Lockstone.ID).ToList(), 
-                    rows, 0,
-                    ScramblerData_Items.Static.Pharros_Lockstone.Min,
-                    ScramblerData_Items.Static.Pharros_Lockstone.Max
-                    );
-                }
-            }
-
-            // Fragrant Branch of Yore
-            foreach (string map in ScramblerData_Items.Static.Fragrant_Branch_of_Yore.Maps)
-            {
-                if (Data.map_itemlots.ContainsKey(map))
-                {
-                    List<PARAM.Row> rows = Data.map_itemlots[map];
-
-                    AssignToolToItemlot(Data.ItemParam.Rows.Where(row =>
-                    row.ID == ScramblerData_Items.Static.Fragrant_Branch_of_Yore.ID).ToList(),
-                    rows.Where(row => 
-                    !ScramblerData_Items.Static.Blacklist_Itemlots_for_Keys.Contains(row.ID)).ToList(), 
-                    0,
-                    ScramblerData_Items.Static.Fragrant_Branch_of_Yore.Min,
-                    ScramblerData_Items.Static.Pharros_Lockstone.Max
-                    );
-                }
-            }
-
-            // Smelter Wedge
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53200000).ToList(), Data.Itemlot_List_Brume_Tower, 0, 1);
-
-            // *** Estus Flask Shard
-            // 1
-            if (rand.Next(100) >= 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Things_Betwixt, 0, 1);
-            else
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Majula, 0, 1);
-
-            // 2
-            if (rand.Next(100) >= 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Forest_of_Fallen_Giants, 0, 1);
-            else
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Brightstone_Cove_Tseldora, 0, 1);
-
-            // 3
-            if (rand.Next(100) >= 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Aldias_Keep, 0, 1);
-            else
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Lost_Bastille, 0, 1);
-
-            // 4
-            if (rand.Next(100) >= 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Earthen_Peak, 0, 1);
-            else
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_No_Mans_Wharf, 0, 1);
-
-            // 5
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Iron_Keep, 0, 1);
-
-            // 6
-            if (rand.Next(100) >= 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Huntmans_Copse, 0, 1);
-            else
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_The_Gutter, 0, 1);
-
-            // 7
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Dragon_Aerie, 0, 1);
-
-            // 8
-            if (rand.Next(100) >= 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Heides_Tower_of_Flame, 0, 1);
-            else
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Shaded_Woods, 0, 1);
-
-            // 9
-            if (rand.Next(100) >= 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Doors_of_Pharros, 0, 1);
-            else
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Grave_of_Saints, 0, 1);
-
-            // 10
-            AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Shrine_of_Amana, 0, 1);
-
-            // 11
-            if(rand.Next(100) >= 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Drangleic_Castle, 0, 1);
-            else
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60525000).ToList(), Data.Itemlot_List_Undead_Crypt, 0, 1);
-
-            // *** Sublime Bone Dust
-            // 1
-            int roll = rand.Next(100);
-
-            if (roll >= 0 && roll < 25)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Things_Betwixt, 0, 1);
-            else if (roll >= 25 && roll < 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Majula, 0, 1);
-            else if (roll >= 50 && roll < 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Forest_of_Fallen_Giants, 0, 1);
-            else if (roll >= 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Brightstone_Cove_Tseldora, 0, 1);
-
-            // 2
-            roll = rand.Next(100);
-
-            if (roll >= 0 && roll < 25)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Aldias_Keep, 0, 1);
-            else if (roll >= 25 && roll < 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Lost_Bastille, 0, 1);
-            else if (roll >= 50 && roll < 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Earthen_Peak, 0, 1);
-            else if (roll >= 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_No_Mans_Wharf, 0, 1);
-
-            // 3
-            roll = rand.Next(100);
-
-            if (roll >= 0 && roll < 25)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Iron_Keep, 0, 1);
-            else if (roll >= 25 && roll < 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Huntmans_Copse, 0, 1);
-            else if (roll >= 50 && roll < 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_The_Gutter, 0, 1);
-            else if (roll >= 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Heides_Tower_of_Flame, 0, 1);
-
-            // 4
-            roll = rand.Next(100);
-
-            if (roll >= 0 && roll < 25)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Dragon_Aerie, 0, 1);
-            else if (roll >= 25 && roll < 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Shaded_Woods, 0, 1);
-            else if (roll >= 50 && roll < 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Doors_of_Pharros, 0, 1);
-            else if (roll >= 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Grave_of_Saints, 0, 1);
-
-            // 5
-            roll = rand.Next(100);
-
-            if (roll >= 0 && roll < 25)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Shrine_of_Amana, 0, 1);
-            else if (roll >= 25 && roll < 50)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Drangleic_Castle, 0, 1);
-            else if (roll >= 50 && roll < 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Undead_Crypt, 0, 1);
-            else if (roll >= 75)
-                AssignToolToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 60526000).ToList(), Data.Itemlot_List_Forest_of_Fallen_Giants, 0, 1);
-
-        }
-
-        public void AssignToolToItemlot(List<PARAM.Row> item, List<PARAM.Row> rows, int slot, int amount, int max_amount = 0)
-        {
-            if (rows.Count < 1)
-            {
-                Util.PrintLine("AssignToolToItemlot: passed rows is empty.");
-                return;
-            }
-
-            Random rand = new Random();
-            bool can_assign = false;
-
-            int index = 0;
-
-            // Only use the itemlot if it has not been previously used
-            while (!can_assign)
-            {
-                index = rand.Next(rows.Count);
-
-                PARAM.Row chosen_row = rows[index];
-
-                // Do not assign if the itemlot has already been used, or it has a never-change item in it or an existing key itemlot
-                if (!Assigned_Itemlots.Contains(chosen_row) &&
-                    !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, chosen_row) &&
-                    (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingLot(ScramblerData_Items.Static.Category_Key_Item, chosen_row))
-                )
-                    can_assign = true;
-            }
-
-            Util.PrintLine($"Assign Tool itemlot: {item[0].ID}");
-
-            // Add the item to the itemlot
-            rows[index][$"item_lot_{slot}"].Value = item[0].ID;
-
-            if (max_amount > 0)
-                rows[index][$"amount_lot_{slot}"].Value = rand.Next(amount, max_amount);
-            else
-                rows[index][$"amount_lot_{slot}"].Value = amount;
-
-            // Add the itemlot to the assigned list
-            Assigned_Itemlots.Add(rows[index]);
-        }
-
-        public void ScrambleBossSoulItems()
-        {
-            // Soul of Nadalia, Bride of Ash
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 53300000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Soul of the Pursuer
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64000000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Soul of the Last Giant
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64010000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Dragonrider Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64020000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Old Dragonslayer Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64030000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Flexile Sentry Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64040000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Ruin Sentinel Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64050000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Soul of the Lost Sinner
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64060000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Executioner's Chariot Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64070000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Skeleton Lord's Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64080000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Covetous Demon Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64090000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Mytha, the Baneful Queen Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64100000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Smelter Demon Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64110000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Old Iron King Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64120000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Royal Rat Vanguard Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64130000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Soul of the Rotten
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64140000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Scorpioness Najka Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64150000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Royal Rat Authority Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64160000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Soul of the Duke's Dear Freja
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64170000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Looking Glass Knight Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64180000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Demon of Song Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64190000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Soul of Velstadt
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64200000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Soul of the King
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64210000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Guardian Dragon Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64220000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Ancient Dragon Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64230000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Giant Lord Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64240000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Soul of Nashandra
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64250000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Throne Defender Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64260000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Throne Watcher Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64270000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Darklurker Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64280000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Belfry Gargoyle Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64290000).ToList(), Data.Itemlot_List_Vanilla, 0, 1);
-
-            // Old Witch Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64300000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Old King Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64310000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Old Dead One Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64320000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Old Paledrake Soul
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64330000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of Sinh, the Slumbering Dragon
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64500000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of the Fume Knight
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64510000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of Aava, the King's Pet
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64520000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of Elana, Squalid Queen
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64530000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of Nadalia, Bride of Ash
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64540000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of Alsanna, Silent Oracle
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64550000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of Sir Alonne
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64560000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of the Ivory King
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64580000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of Zallen, the King's Pet
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64590000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-
-            // Soul of Lud, the King's Pet
-            AssignBossSoulToItemlot(Data.ItemParam.Rows.Where(row => row.ID == 64610000).ToList(), Data.Itemlot_List_DLC, 0, 1);
-        }
-
-        public void AssignBossSoulToItemlot(List<PARAM.Row> item, List<PARAM.Row> rows, int slot, int amount)
-        {
-            if (rows.Count < 1)
-            {
-                Util.PrintLine("AssignBossSoulToItemlot: passed rows is empty.");
-                return;
-            }
-
-            Random rand = new Random();
-            bool can_assign = false;
-
-            int index = 0;
-
-            // Only use the itemlot if it has not been previously used
-            while (!can_assign)
-            {
-                index = rand.Next(rows.Count);
-
-                PARAM.Row chosen_row = rows[index];
-
-                // Do not assign if the itemlot has already been used, or it has a never-change item in it or an existing key itemlot or an existing tool itemlot
-                if (!Assigned_Itemlots.Contains(chosen_row) &&
-                !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, chosen_row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingLot(ScramblerData_Items.Static.Category_Key_Item, chosen_row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingLot(ScramblerData_Items.Static.Category_Tool_Item, chosen_row))
-                )
-                    can_assign = true;
-            }
-
-            Util.PrintLine($"Assign Boss Soul itemlot: {item[0].ID}");
-
-            // Add the item to the itemlot
-            rows[index][$"item_lot_{slot}"].Value = item[0].ID;
-            rows[index][$"amount_lot_{slot}"].Value = amount;
-            rows[index][$"reinforcement_lot_{slot}"].Value = 0;
-            rows[index][$"infusion_lot_{slot}"].Value = 0;
-
-            // Add the itemlot to the assigned list
-            Assigned_Itemlots.Add(rows[index]);
-        }
-
-        public void ScrambleBossRewards(List<PARAM.Row> itemlots)
-        {
-            foreach (PARAM.Row row in itemlots)
-            {
-                // Do not change the already changed, or those that have keys/tools/boss souls.
-                if (!Assigned_Itemlots.Contains(row) &&
-                !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingLot(ScramblerData_Items.Static.Category_Key_Item, row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingLot(ScramblerData_Items.Static.Category_Tool_Item, row)))
-                {
-                    Util.PrintLine($"Assign Boss Reward itemlot: {row.ID}");
-                    SelectUniqueItemForItemlot(row, 10, false);
-                }
-            }
-        }
-
-        public void ScrambleCharacterRewards(List<PARAM.Row> itemlots)
-        {
-            foreach (PARAM.Row row in itemlots)
-            {
-                // Do not change the already changed, or those that have keys/tools/boss souls.
-                if (!Assigned_Itemlots.Contains(row) &&
-                !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingLot(ScramblerData_Items.Static.Category_Key_Item, row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingLot(ScramblerData_Items.Static.Category_Tool_Item, row)))
-                {
-                    Util.PrintLine($"Assign Character Reward itemlot: {row.ID}");
-                    SelectItemForItemlot(row, 10, false);
-                }
-            }
-        }
-
-        public void ScrambleCovenantRewards(List<PARAM.Row> itemlots)
-        {
-            foreach (PARAM.Row row in itemlots)
-            {
-                // Do not change the already changed, or those that have keys/tools/boss souls.
-                if (!Assigned_Itemlots.Contains(row) &&
-                !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingLot(ScramblerData_Items.Static.Category_Key_Item, row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingLot(ScramblerData_Items.Static.Category_Tool_Item, row)))
-                {
-                    Util.PrintLine($"Assign Covenant Reward itemlot: {row.ID}");
-                    SelectUniqueItemForItemlot(row, 10, false);
-                }
-            }
-        }
-
-        public void ScrambleBirdRewards(List<PARAM.Row> itemlots)
-        {
-            foreach (PARAM.Row row in itemlots)
-            {
-                // Do not change the already changed, or those that have keys/tools/boss souls.
-                if (!Assigned_Itemlots.Contains(row) &&
-                !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingLot(ScramblerData_Items.Static.Category_Key_Item, row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingLot(ScramblerData_Items.Static.Category_Tool_Item, row)))
-                {
-                    Util.PrintLine($"Assign Bird Reward itemlot: {row.ID}");
-                    SelectItemForItemlot(row, 10, false);
-                }
-            }
-        }
-
-        public void ScrambleEventRewards(List<PARAM.Row> itemlots)
-        {
-            foreach (PARAM.Row row in itemlots)
-            {
-                // Do not change the already changed, or those that have keys/tools/boss souls.
-                if (!Assigned_Itemlots.Contains(row) &&
-                !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingLot(ScramblerData_Items.Static.Category_Key_Item, row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingLot(ScramblerData_Items.Static.Category_Tool_Item, row)))
-                {
-                    Util.PrintLine($"Assign Event Reward itemlot: {row.ID}");
-                    SelectItemForItemlot(row, 10, false);
-                }
-            }
-        }
-
-        public void ScrambleMapLoot(List<PARAM.Row> itemlots)
-        {
-            foreach (PARAM.Row row in itemlots)
-            {
-                // Do not change the already changed, or those that have keys/tools/boss souls.
-                if (!Assigned_Itemlots.Contains(row) &&
-                !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingLot(ScramblerData_Items.Static.Category_Key_Item, row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingLot(ScramblerData_Items.Static.Category_Tool_Item, row)))
-                {
-                    Util.PrintLine($"Assign Map Treasure itemlot: {row.ID}");
-                    SelectItemForItemlot(row, 10, false);
-                }
-            }
-        }
-
-        public void ScrambleEnemyDrops(List<PARAM.Row> itemlots)
-        {
-            foreach (PARAM.Row row in itemlots)
-            {
-                // Do not change the already changed, or those that have keys/tools/boss souls.
-                if (!Assigned_Itemlots.Contains(row) &&
-                !HasMatchingLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingLot(ScramblerData_Items.Static.Category_Key_Item, row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingLot(ScramblerData_Items.Static.Category_Tool_Item, row)))
-                {
-                    Util.PrintLine($"Assign Enemy Drop itemlot: {row.ID}");
-                    SelectItemForItemlot(row, 60510000, true);
-                }
-            }
-        }
-
-        public void ScrambleShops()
-        {
-            AssignShopItemlot(Data.Shoplot_List_Vengarl);
-            AssignShopItemlot(Data.Shoplot_List_Agdayne);
-            AssignShopItemlot(Data.Shoplot_List_Gilligan_InitialStage);
-            AssignShopItemlot(Data.Shoplot_List_Wellager);
-            AssignShopItemlot(Data.Shoplot_List_Grandahl);
-            AssignShopItemlot(Data.Shoplot_List_Gavlan);
-            AssignShopItemlot(Data.Shoplot_List_Melentia);
-            AssignShopItemlot(Data.Shoplot_List_Rat_King);
-            AssignShopItemlot(Data.Shoplot_List_Maughlin);
-            AssignShopItemlot(Data.Shoplot_List_Chloanne);
-            AssignShopItemlot(Data.Shoplot_List_Rosabeth);
-            AssignShopItemlot(Data.Shoplot_List_Lenigrast);
-            AssignShopItemlot(Data.Shoplot_List_McDuff);
-            AssignShopItemlot(Data.Shoplot_List_Carhillion);
-            AssignShopItemlot(Data.Shoplot_List_Carhillion_InitialStage);
-            AssignShopItemlot(Data.Shoplot_List_Straid);
-            AssignShopItemlot(Data.Shoplot_List_Licia);
-            AssignShopItemlot(Data.Shoplot_List_Licia_InitialStage);
-            AssignShopItemlot(Data.Shoplot_List_Felkin);
-            AssignShopItemlot(Data.Shoplot_List_Navlaan);
-            AssignShopItemlot(Data.Shoplot_List_Magerold);
-            AssignShopItemlot(Data.Shoplot_List_Ornifex);
-            AssignShopItemlot(Data.Shoplot_List_Shalquoir);
-            AssignShopItemlot(Data.Shoplot_List_Gren);
-            AssignShopItemlot(Data.Shoplot_List_Cromwell);
-            AssignShopItemlot(Data.Shoplot_List_Targray);
-
-            UpdateSecondStageShopEntries(Data.Shoplot_List_Gilligan_InitialStage, Data.Shoplot_List_Gilligan_SecondStage);
-            UpdateSecondStageShopEntries(Data.Shoplot_List_Carhillion_InitialStage, Data.Shoplot_List_Carhillion_SecondStage);
-            UpdateSecondStageShopEntries(Data.Shoplot_List_Licia_InitialStage, Data.Shoplot_List_Licia_SecondStage);
-
-            if (T_Ensure_Lifegems)
-            {
-                List<PARAM.Row> rows = Data.Shoplot_List_Melentia.Where(row => row.ID == 75400600).ToList();
-                rows[0]["equip_id"].Value = 60538000;
-                rows[0]["quantity"].Value = 255;
-                List<PARAM.Row> rowfek = Data.Shoplot_List_Felkin.Where(row => row.ID == 77000600).ToList();
-                rowfek[0]["equip_id"].Value = 60527000;
-                rowfek[0]["quantity"].Value = 255;
-                List<PARAM.Row> rowsha = Data.Shoplot_List_Shalquoir.Where(row => row.ID == 77700402).ToList();
-                rowsha[0]["equip_id"].Value = 40420000;
-                rowsha[0]["quantity"].Value = 1;
-
-            }
-        }
-
-        public void UpdateSecondStageShopEntries(List<PARAM.Row> initialShopRows, List<PARAM.Row> secondShopRows)
-        {
-            // Update second stage shop
-            for (int i = 0; i < initialShopRows.Count; i++)
-            {
-                PARAM.Row original_row = initialShopRows[i];
-                PARAM.Row free_row = secondShopRows[i];
-
-                free_row["equip_id"].Value = original_row["equip_id"].Value;
-                free_row["quantity"].Value = original_row["quantity"].Value;
-            }
-        }
-
-        public void AssignShopItemlot(List<PARAM.Row> rows)
-        {
-            Random rand = new Random();
-            
-            foreach(PARAM.Row row in rows)
-            {
-                if(!HasMatchingShopLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingShopLot(ScramblerData_Items.Static.Category_Key_Item, row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingShopLot(ScramblerData_Items.Static.Category_Tool_Item, row)))
-                {
-                    Util.PrintLine($"Assign shoplot: {row.ID}");
-                    SelectItemForShoplot(row);
-                }
-            }
-        }
-
-        public void ScrambleBossSoulTrades()
-        {
-            AssignBossTradeItemlot(Data.Shoplot_List_Straid_Boss);
-            AssignBossTradeItemlot(Data.Shoplot_List_Ornifex_Boss);
-
-            // Duplicate Ornifex's assignments to the free rows, but se the price_rate to 0.
-            for(int i = 0; i < Data.Shoplot_List_Ornifex_Boss.Count; i++)
-            {
-                PARAM.Row original_row = Data.Shoplot_List_Ornifex_Boss[i];
-                PARAM.Row free_row = Data.Shoplot_List_Ornifex_Boss_Free[i];
-
-                free_row["equip_id"].Value = original_row["equip_id"].Value;
-                free_row["Unk00"].Value = original_row["Unk00"].Value;
-                free_row["enable_flag"].Value = original_row["enable_flag"].Value;
-                free_row["disable_flag"].Value = original_row["disable_flag"].Value;
-                free_row["material_id"].Value = original_row["material_id"].Value;
-                free_row["duplicate_item_id"].Value = original_row["duplicate_item_id"].Value;
-                free_row["Unk01"].Value = original_row["Unk01"].Value;
-                free_row["price_rate"].Value = 0;
-                free_row["quantity"].Value = original_row["quantity"].Value;
-            }
-        }
-
-        public void AssignBossTradeItemlot(List<PARAM.Row> rows)
-        {
-            Random rand = new Random();
-
+            // Build list of possible values
             foreach (PARAM.Row row in rows)
             {
-                if (!HasMatchingShopLot(ScramblerData_Items.Static.Blacklist_Itemlot_Contents, row) &&
-                (!T_Ignore_Keys || T_Ignore_Keys && !HasMatchingShopLot(ScramblerData_Items.Static.Category_Key_Item, row)) &&
-                (!T_Ignore_Tools || T_Ignore_Tools && !HasMatchingShopLot(ScramblerData_Items.Static.Category_Tool_Item, row)))
+                foreach (PARAM.Cell cell in row.Cells)
                 {
-                    Util.PrintLine($"Assign Boss Trade shoplot: {row.ID}");
-                    SelectUniqueItemForShoplot(row);
-                }
-            }
-        }
-
-        public void SelectUniqueItemForItemlot(PARAM.Row row, int EmptyItemID, bool isEnemyDrop)
-        {
-            Random rand = new Random();
-
-            for (int slot = 0; slot <= 9; slot++)
-            {
-                int roll = rand.Next(100);
-
-                int item_lot_value = (int)row[$"item_lot_{slot}"].Value;
-
-                // Item lot slot is not empty
-                if (item_lot_value != EmptyItemID)
-                {
-                    // Weapon
-                    if (roll >= 0 && roll <= 25)
+                    if (cell.Def.InternalName == field)
                     {
-                        Util.PrintLine($"Selected unique item for treasure: Weapon");
-
-                        AddItemToItemlot(row, slot, Unassigned_Weapons, Data.Row_List_Weapons, isEnemyDrop);
-                    }
-                    // Armor
-                    else if (roll >= 25 && roll <= 50)
-                    {
-                        Util.PrintLine($"Selected unique item for treasure: Armor");
-
-                        AddItemToItemlot(row, slot, Unassigned_Armor, Data.Row_List_Armor, isEnemyDrop);
-                    }
-                    // Spells
-                    else if (roll >= 50 && roll <= 75)
-                    {
-                        Util.PrintLine($"Selected unique item for treasure: Spell");
-
-                        AddItemToItemlot(row, slot, Unassigned_Spells, Data.Row_List_Spells, isEnemyDrop);
-                    }
-                    // Rings
-                    else if (roll >= 75)
-                    {
-                        Util.PrintLine($"Selected unique item for treasure: Ring");
-
-                        AddItemToItemlot(row, slot, Unassigned_Rings, Data.Row_List_Rings, isEnemyDrop);
+                        new_list.Add((uint)cell.Value);
                     }
                 }
             }
 
-            Assigned_Itemlots.Add(row);
+            // Assign new
+            foreach (PARAM.Row row in rows)
+            {
+                foreach (PARAM.Cell cell in row.Cells)
+                {
+                    if (cell.Def.InternalName == field)
+                    {
+                        cell.Value = new_list[rand.Next(new_list.Count)];
+                    }
+                }
+            }
         }
 
-        public void SelectItemForItemlot(PARAM.Row row, int EmptyItemID, bool isEnemyDrop)
+        public Regulation Scramble_ArmorAttributes(
+            bool c_ItemParam_Armor_Price,
+            bool c_ItemParam_Armor_Effect,
+            bool c_ArmorParam_Armor_Weight,
+            bool c_ArmorParam_Armor_Durability,
+            bool c_ArmorParam_Defence,
+            bool c_ArmorParam_StatRequirements,
+            bool c_ArmorParam_Poise,
+            bool c_ArmorReinforceParam_Absorption,
+            bool c_Tweak_ArmorParam_RemoveStatRequirements
+        )
         {
-            Random rand = new Random();
+            List<PARAM.Row> ItemParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ItemParam")).ToList()[0].Rows;
+            List<PARAM.Row> ArmorParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ArmorParam")).ToList()[0].Rows;
+            List<PARAM.Row> ArmorReinforceParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ArmorReinforceParam")).ToList()[0].Rows;
 
-            for (int slot = 0; slot <= 9; slot++)
+            if(c_ItemParam_Armor_Price)
             {
-                int roll = rand.Next(100);
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+               row.ID >= ScramblerData_Items.Static.ArmorParam_Category_Start &&
+               row.ID <= ScramblerData_Items.Static.ArmorParam_Category_End
+               ).ToList();
 
-                int item_lot_value = (int)row[$"item_lot_{slot}"].Value;
-
-                // Remove any preset reinforcement/infusions
-                row[$"reinforcement_lot_{slot}"].Value = 0;
-                row[$"infusion_lot_{slot}"].Value = 0;
-
-                // Item lot slot is not empty
-                if (item_lot_value != EmptyItemID)
+                foreach (PARAM.Row row in rows)
                 {
-                    // Weapon
-                    if (roll >= 0 && roll <= 10)
+                    row["base_price"].Value = GetRandomInt(ScramblerData_Params.Static.ArmorParamData.Base_Price_Min, ScramblerData_Params.Static.ArmorParamData.Base_Price_Max);
+                    row["sell_price"].Value = GetRandomInt(ScramblerData_Params.Static.ArmorParamData.Sell_Price_Min, ScramblerData_Params.Static.ArmorParamData.Sell_Price_Max);
+                }
+            }
+            if (c_ItemParam_Armor_Effect)
+            {
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                    row.ID >= ScramblerData_Items.Static.ArmorParam_Category_Start &&
+                    row.ID <= ScramblerData_Items.Static.ArmorParam_Category_End
+                ).ToList();
+
+                List<int> list = new List<int>();
+
+                if (ScramblerData_Params.Static.ArmorParamData.Include_Weapon_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Weapon_SpEffect_ID_List)
                     {
-                        Util.PrintLine($"Selected item for treasure: Weapon");
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ArmorParamData.Include_Armor_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Armor_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ArmorParamData.Include_Ring_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Ring_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ArmorParamData.Include_Item_Action_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Action_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ArmorParamData.Include_Item_Soul_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Soul_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ArmorParamData.Include_Item_Warp_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Warp_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ArmorParamData.Include_Item_Misc_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Misc_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
 
-                        AddItemToItemlot(row, slot, Unassigned_Weapons, Data.Row_List_Weapons, isEnemyDrop);
+                foreach (PARAM.Row row in rows)
+                {
+                    if (list.Count > 0)
+                    {
+                        var result = list[rand.Next(list.Count)];
 
-                        // Set infusion and reinforcement in rare cases
-                        if(rand.Next(100) < 15)
+                        row["speffect_id"].Value = result;
+                    }
+                }
+            }
+            if (c_ArmorParam_Armor_Weight)
+            {
+                List<PARAM.Row> rows = ArmorParam.Where(row => 
+                row.ID >= 11010100 && 
+                row.ID <= 1715950103
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["weight"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Weight_Min, ScramblerData_Params.Static.ArmorParamData.Weight_Max);
+                }
+            }
+            if (c_ArmorParam_Armor_Durability)
+            {
+                List<PARAM.Row> rows = ArmorParam.Where(row =>
+                 row.ID >= 11010100 &&
+                 row.ID <= 17950103
+                 ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["durability"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Durability_Min, ScramblerData_Params.Static.ArmorParamData.Durability_Max);
+                }
+            }
+            if (c_ArmorParam_Defence)
+            {
+                List<PARAM.Row> rows = ArmorParam.Where(row =>
+                row.ID >= 11010100 &&
+                row.ID <= 17950103
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["physical_defence_scaling"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Physical_Defence_Scaling_Min, ScramblerData_Params.Static.ArmorParamData.Physical_Defence_Scaling_Max);
+                    row["Unk11"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Unk11_Min, ScramblerData_Params.Static.ArmorParamData.Unk11_Max);
+                    row["Unk12"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Unk12_Min, ScramblerData_Params.Static.ArmorParamData.Unk12_Max);
+                    row["Unk13"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Unk13_Min, ScramblerData_Params.Static.ArmorParamData.Unk13_Max);
+                }
+            }
+            if (c_ArmorParam_StatRequirements)
+            {
+                List<PARAM.Row> rows = ArmorParam.Where(row =>
+                row.ID >= 11010100 &&
+                row.ID <= 17950103
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["strength_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.ArmorParamData.STR_Requirement_Min, ScramblerData_Params.Static.ArmorParamData.STR_Requirement_Max);
+                    row["dexterity_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.ArmorParamData.DEX_Requirement_Min, ScramblerData_Params.Static.ArmorParamData.DEX_Requirement_Max);
+                    row["intelligence_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.ArmorParamData.INT_Requirement_Min, ScramblerData_Params.Static.ArmorParamData.INT_Requirement_Max);
+                    row["faith_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.ArmorParamData.FTH_Requirement_Min, ScramblerData_Params.Static.ArmorParamData.FTH_Requirement_Max);
+                }
+            }
+            if (c_ArmorParam_Poise)
+            {
+                List<PARAM.Row> rows = ArmorParam.Where(row =>
+                row.ID >= 11010100 &&
+                row.ID <= 17950103
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["poise"].Value = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Poise_Min, ScramblerData_Params.Static.ArmorParamData.Poise_Max);
+                }
+            }
+            if (c_ArmorReinforceParam_Absorption)
+            {
+                List<PARAM.Row> rows = ArmorReinforceParam.Where(row =>
+                row.ID >= 11010100 &&
+                row.ID <= 17950103
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    // Defence
+                    var base_slash = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Slash_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Slash_Absorption_Max);
+                    var base_thrust = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Thrust_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Thrust_Absorption_Max);
+                    var base_strike = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Strike_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Strike_Absorption_Max);
+                    var base_standard = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Standard_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Standard_Absorption_Max);
+
+                    var base_magic = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Magic_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Magic_Absorption_Max);
+                    var base_lightning = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Lightning_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Lightning_Absorption_Max);
+                    var base_fire = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Fire_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Fire_Absorption_Max);
+                    var base_dark = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Dark_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Dark_Absorption_Max);
+
+                    var base_poison = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Poison_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Poison_Absorption_Max);
+                    var base_bleed = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Bleed_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Bleed_Absorption_Max);
+                    var base_petrify = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Petrify_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Petrify_Absorption_Max);
+                    var base_curse = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Curse_Absorption_Min, ScramblerData_Params.Static.ArmorParamData.Curse_Absorption_Max);
+
+                    var growth = GetRandomFloat(ScramblerData_Params.Static.ArmorParamData.Absorption_Growth_Min, ScramblerData_Params.Static.ArmorParamData.Absorption_Growth_Max);
+
+                    row["defence_slash"].Value = base_slash;
+                    row["defence_thrust"].Value = base_thrust;
+                    row["defence_strike"].Value = base_strike;
+                    row["defence_standard"].Value = base_standard;
+
+                    row["absorption_magic"].Value = base_magic;
+                    row["absorption_lightning"].Value = base_lightning;
+                    row["absorption_fire"].Value = base_fire;
+                    row["absorption_dark"].Value = base_dark;
+
+                    row["absorption_poison"].Value = base_poison;
+                    row["absorption_bleed"].Value = base_bleed;
+                    row["absorption_petrify"].Value = base_petrify;
+                    row["absorption_curse"].Value = base_curse;
+
+                    row["max_defence_slash"].Value = (int)(base_slash * growth);
+                    row["max_defence_thrust"].Value = (int)(base_thrust * growth);
+                    row["max_defence_strike"].Value = (int)(base_strike * growth);
+                    row["max_defence_standard"].Value = (int)(base_standard * growth);
+
+                    row["max_absorption_magic"].Value = (int)(base_magic * growth);
+                    row["max_absorption_lightning"].Value = (int)(base_lightning * growth);
+                    row["max_absorption_fire"].Value = (int)(base_fire * growth);
+                    row["max_absorption_dark"].Value = (int)(base_dark * growth);
+
+                    row["max_absorption_poison"].Value = (int)(base_poison * growth);
+                    row["max_absorption_bleed"].Value = (int)(base_bleed * growth);
+                    row["max_absorption_petrify"].Value = (int)(base_petrify * growth);
+                    row["max_absorption_curse"].Value = (int)(base_curse * growth);
+                }
+            }
+
+            // Tweaks
+            if (c_Tweak_ArmorParam_RemoveStatRequirements)
+            {
+                List<PARAM.Row> rows = ArmorParam.Where(row =>
+                row.ID >= 11010100 &&
+                row.ID <= 17950103
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["strength_requirement"].Value = 0;
+                    row["dexterity_requirement"].Value = 0;
+                    row["intelligence_requirement"].Value = 0;
+                    row["faith_requirement"].Value = 0;
+                }
+            }
+
+            return regulation;
+        }
+
+        public Regulation Scramble_RingAttributes(
+            bool c_ItemParam_Ring_Price,
+            bool c_ItemParam_Ring_Effect,
+            bool c_RingParam_Ring_Weight,
+            bool c_RingParam_Ring_Durability
+        )
+        {
+            List<PARAM.Row> ItemParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ItemParam")).ToList()[0].Rows;
+            List<PARAM.Row> RingParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"RingParam")).ToList()[0].Rows;
+
+            if (c_ItemParam_Ring_Price)
+            {
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.RingParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.RingParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["base_price"].Value = GetRandomInt(ScramblerData_Params.Static.RingParamData.Base_Price_Min, ScramblerData_Params.Static.RingParamData.Base_Price_Max);
+                    row["sell_price"].Value = GetRandomInt(ScramblerData_Params.Static.RingParamData.Sell_Price_Min, ScramblerData_Params.Static.RingParamData.Sell_Price_Max);
+                }
+            }
+            if (c_ItemParam_Ring_Effect)
+            {
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.RingParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.RingParam_Category_End
+                ).ToList();
+
+                List<int> list = new List<int>();
+
+                if (ScramblerData_Params.Static.RingParamData.Include_Weapon_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Weapon_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.RingParamData.Include_Armor_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Armor_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.RingParamData.Include_Ring_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Ring_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.RingParamData.Include_Item_Action_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Action_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.RingParamData.Include_Item_Soul_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Soul_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.RingParamData.Include_Item_Warp_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Warp_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.RingParamData.Include_Item_Misc_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Misc_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+
+                foreach (PARAM.Row row in rows)
+                {
+                    if (list.Count > 0)
+                    {
+                        var result = list[rand.Next(list.Count)];
+
+                        row["speffect_id"].Value = result;
+                    }
+                }
+            }
+            if (c_RingParam_Ring_Weight)
+            {
+                List<PARAM.Row> rows = RingParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.RingParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.RingParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["weight"].Value = GetRandomFloat(ScramblerData_Params.Static.RingParamData.Weight_Min, ScramblerData_Params.Static.RingParamData.Weight_Max);
+                }
+            }
+            if (c_RingParam_Ring_Durability)
+            {
+                List<PARAM.Row> rows = RingParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.RingParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.RingParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["durability"].Value = (float)GetRandomInt(ScramblerData_Params.Static.RingParamData.Durability_Min, ScramblerData_Params.Static.RingParamData.Durability_Max);
+                }
+            }
+
+            return regulation;
+        }
+        public Regulation Scramble_ItemAttributes(
+            bool c_ItemParam_Item_Price,
+            bool c_ItemParam_Item_Animation_Speed,
+            bool c_ItemParam_Item_Max_Hold_Count,
+            bool c_ItemParam_Item_Effect
+        )
+        {
+            List<PARAM.Row> ItemParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ItemParam")).ToList()[0].Rows;
+
+            if (c_ItemParam_Item_Price)
+            {
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.ItemParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.ItemParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["base_price"].Value = GetRandomInt(ScramblerData_Params.Static.ItemParamData.Base_Price_Min, ScramblerData_Params.Static.ItemParamData.Base_Price_Max);
+                    row["sell_price"].Value = GetRandomInt(ScramblerData_Params.Static.ItemParamData.Sell_Price_Min, ScramblerData_Params.Static.ItemParamData.Sell_Price_Max);
+                }
+            }
+            if (c_ItemParam_Item_Animation_Speed)
+            {
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.ItemParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.ItemParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["animation_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.ItemParamData.Animation_Speed_Min, ScramblerData_Params.Static.ItemParamData.Animation_Speed_Max);
+                }
+            }
+            if (c_ItemParam_Item_Max_Hold_Count)
+            {
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.ItemParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.ItemParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    if((ushort)row["max_held_count"].Value > 1)
+                        row["max_held_count"].Value = GetRandomUShort(ScramblerData_Params.Static.ItemParamData.Hold_Count_Min, ScramblerData_Params.Static.ItemParamData.Hold_Count_Max);
+                }
+            }
+            if (c_ItemParam_Item_Effect)
+            {
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.ItemParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.ItemParam_Category_End
+                ).ToList();
+
+                List<int> list = new List<int>();
+
+                if (ScramblerData_Params.Static.ItemParamData.Include_Weapon_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Weapon_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ItemParamData.Include_Armor_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Armor_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ItemParamData.Include_Ring_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Ring_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ItemParamData.Include_Item_Action_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Action_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ItemParamData.Include_Item_Soul_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Soul_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ItemParamData.Include_Item_Warp_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Warp_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ItemParamData.Include_Item_Misc_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Misc_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+
+                foreach (PARAM.Row row in rows)
+                {
+                    if (list.Count > 0)
+                    {
+                        var result = list[rand.Next(list.Count)];
+
+                        row["speffect_id"].Value = result;
+                    }
+
+                    if (ScramblerData_Params.Static.ItemParamData.Force_Homeward_Item_Effects == 1)
+                    {
+                        if(row.ID == 60350000)
                         {
-                            row[$"reinforcement_lot_{slot}"].Value = rand.Next(1, 5);
-                            row[$"infusion_lot_{slot}"].Value = rand.Next(1, 8);
+                            row["speffect_id"].Value = 60350000;
+                        }
+                        if (row.ID == 60355000)
+                        {
+                            row["speffect_id"].Value = 60355000;
+                        }
+                        if (row.ID == 60360000)
+                        {
+                            row["speffect_id"].Value = 60360000;
                         }
                     }
-                    // Armor
-                    else if (roll >= 10 && roll <= 20)
-                    {
-                        Util.PrintLine($"Selected item for treasure: Armor");
-
-                        AddItemToItemlot(row, slot, Unassigned_Armor, Data.Row_List_Armor, isEnemyDrop);
-                    }
-                    // Spells
-                    else if (roll >= 20 && roll <= 30)
-                    {
-                        Util.PrintLine($"Selected item for treasure: Spell");
-
-                        AddItemToItemlot(row, slot, Unassigned_Spells, Data.Row_List_Spells, isEnemyDrop);
-                    }
-                    // Rings
-                    else if (roll >= 30 && roll <= 40)
-                    {
-                        Util.PrintLine($"Selected item for treasure: Ring");
-
-                        AddItemToItemlot(row, slot, Unassigned_Rings, Data.Row_List_Rings, isEnemyDrop);
-                    }
-                    // Item: Ammunition
-                    else if (roll >= 40 && roll <= 45)
-                    {
-                        Util.PrintLine($"Selected item for treasure: Ammunition");
-
-                        AddItemToItemlot(row, slot, null, Data.Row_List_Ammunition, isEnemyDrop, 10, 50);
-                    }
-                    // Item: Material
-                    else if (roll >= 45 && roll <= 50)
-                    {
-                        Util.PrintLine($"Selected item for treasure: Material");
-
-                        AddItemToItemlot(row, slot, null, Data.Row_List_Materials, isEnemyDrop, 1, 3);
-                    }
-                    // Item: Soul
-                    else if (roll >= 50 && roll <= 60)
-                    {
-                        Util.PrintLine($"Selected item for treasure: Soul");
-
-                        AddItemToItemlot(row, slot, null, Data.Row_List_Soul_Consumables, isEnemyDrop, 1, 3);
-                    }
-                    // Item: Throwable
-                    else if (roll >= 60 && roll <= 70)
-                    {
-                        Util.PrintLine($"Selected item for treasure: Throwable");
-
-                        AddItemToItemlot(row, slot, null, Data.Row_List_Throwable_Consumable, isEnemyDrop, 1, 3);
-                    }
-                    // Item: Spice/Bird
-                    else if (roll >= 70 && roll <= 80)
-                    {
-                        Util.PrintLine($"Selected item for treasure: Spice/Bird");
-
-                        if (roll >= 75)
-                            AddItemToItemlot(row, slot, null, Data.Row_List_Bird_Consumables, isEnemyDrop, 1, 3);
-                        else
-                            AddItemToItemlot(row, slot, null, Data.Row_List_Spell_Upgrades, isEnemyDrop, 1, 3);
-                    }
-                    // Item: HP/Cast
-                    else if (roll >= 80 && roll <= 90)
-                    {
-                        Util.PrintLine($"Selected item for treasure: HP/Cast");
-
-                        if (roll >= 85)
-                            AddItemToItemlot(row, slot, null, Data.Row_List_HP_Consumables, isEnemyDrop, 1, 3);
-                        else
-                            AddItemToItemlot(row, slot, null, Data.Row_List_Cast_Consumables, isEnemyDrop, 1, 3);
-                    }
-                    // Item: Misc
-                    else if (roll >= 90)
-                    {
-                        Util.PrintLine($"Selected item for treasure: Misc");
-                        AddItemToItemlot(row, slot, null, Data.Row_List_Misc_Consumable, isEnemyDrop, 1, 5);
-                    }
                 }
             }
 
-            Assigned_Itemlots.Add(row);
+            return regulation;
         }
 
-        public void AddItemToItemlot(PARAM.Row row, int slot, List<PARAM.Row> unassigned_list, List<PARAM.Row> fallback_list, bool isEnemyDrop, int min = 0, int max = 0)
+        public Regulation Scramble_SpellAttributes(
+            bool c_ItemParam_Spell_Price,
+            bool c_SpellParam_StatRequirements,
+            bool c_SpellParam_StartupSpeed,
+            bool c_SpellParam_CastAnimations,
+            bool c_SpellParam_StaminaConsumption,
+            bool c_SpellParam_CastSpeed,
+            bool c_SpellParam_SlotsUsed,
+            bool c_SpellParam_Casts,
+            bool c_Tweak_SpellParam_RemoveStatRequirements
+        )
         {
-            Random rand = new Random();
+            List<PARAM.Row> ItemParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ItemParam")).ToList()[0].Rows;
+            List<PARAM.Row> SpellParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"SpellParam")).ToList()[0].Rows;
 
-            PARAM.Row value = null;
-
-            // Use this list first so each weapon appears at least once.
-            if (unassigned_list != null && unassigned_list.Count > 0)
+            if (c_ItemParam_Spell_Price)
             {
-                value = unassigned_list[rand.Next(unassigned_list.Count)];
+                List<PARAM.Row> rows = ItemParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.SpellParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.SpellParam_Category_End
+                ).ToList();
 
-                row[$"item_lot_{slot}"].Value = value.ID;
-                Util.PrintLine($"Adding to itemlot from unassigned: {value.ID}");
-            }
-            // After all weapons are present, allow duplicates
-            else
-            {
-                value = fallback_list[rand.Next(fallback_list.Count)];
-
-                row[$"item_lot_{slot}"].Value = value.ID;
-                Util.PrintLine($"Adding to itemlot from any: {value.ID}");
-            }
-
-            if (min > 0 && max > 0)
-                row[$"amount_lot_{slot}"].Value = rand.Next(min, max);
-            else
-                row[$"amount_lot_{slot}"].Value = 1;
-
-            // For enemy drop lots
-            if (isEnemyDrop)
-            {
-                // If it is not a guaranteed drop, randomise the chance
-                if ((float)row[$"chance_lot_{slot}"].Value != 100)
+                foreach (PARAM.Row row in rows)
                 {
-                    row[$"chance_lot_{slot}"].Value = (float)rand.Next(1, 25);
+                    row["base_price"].Value = GetRandomInt(ScramblerData_Params.Static.SpellParamData.Base_Price_Min, ScramblerData_Params.Static.SpellParamData.Base_Price_Max);
+                    row["sell_price"].Value = GetRandomInt(ScramblerData_Params.Static.SpellParamData.Sell_Price_Min, ScramblerData_Params.Static.SpellParamData.Sell_Price_Max);
+                }
+            }
+            if (c_SpellParam_StatRequirements)
+            {
+                List<PARAM.Row> rows = SpellParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.SpellParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.SpellParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["int_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.SpellParamData.INT_Requirement_Min, ScramblerData_Params.Static.SpellParamData.INT_Requirement_Max);
+                    row["fth_requirement"].Value = GetRandomUShort(ScramblerData_Params.Static.SpellParamData.FTH_Requirement_Min, ScramblerData_Params.Static.SpellParamData.FTH_Requirement_Max);
+                }
+            }
+            if (c_SpellParam_StartupSpeed)
+            {
+                List<PARAM.Row> rows = SpellParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.SpellParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.SpellParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["startup_duration"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Startup_Speed_Min, ScramblerData_Params.Static.SpellParamData.Startup_Speed_Max);
+                }
+            }
+            if (c_SpellParam_CastAnimations)
+            {
+                List<PARAM.Row> rows = SpellParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.SpellParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.SpellParam_Category_End
+                ).ToList();
+
+                // This assigns new values based on the range of values within the existing fields.
+                foreach (string value in ScramblerData_Core.Static.SpellCastAnimationFields)
+                {
+                    AssignRandomCast(value, rows);
+                }
+            }
+            if (c_SpellParam_StaminaConsumption)
+            {
+                List<PARAM.Row> rows = SpellParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.SpellParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.SpellParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["stamina_cost_1h_left"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Min, ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Max);
+                    row["stamina_cost_1h_right"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Min, ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Max);
+                    row["stamina_cost_2h_left"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Min, ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Max);
+                    row["stamina_cost_2h_right"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Min, ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Max);
+                    row["Unk13"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Min, ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Max);
+                    row["Unk18"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Min, ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Max);
+                    row["Unk23"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Min, ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Max);
+                    row["Unk28"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Min, ScramblerData_Params.Static.SpellParamData.Stamina_Consumption_Max);
+                }
+            }
+            if (c_SpellParam_CastSpeed)
+            {
+                List<PARAM.Row> rows = SpellParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.SpellParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.SpellParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["cast_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.SpellParamData.Cast_Speed_Min, ScramblerData_Params.Static.SpellParamData.Cast_Speed_Max);
+                }
+            }
+            if (c_SpellParam_SlotsUsed)
+            {
+                List<PARAM.Row> rows = SpellParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.SpellParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.SpellParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["slots_used"].Value = GetRandomByte(ScramblerData_Params.Static.SpellParamData.Slots_Used_Min, ScramblerData_Params.Static.SpellParamData.Slots_Used_Max);
+                }
+            }
+            if (c_SpellParam_Casts)
+            {
+                List<PARAM.Row> rows = SpellParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.SpellParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.SpellParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    var base_casts = GetRandomByte(ScramblerData_Params.Static.SpellParamData.Base_Casts_Min, ScramblerData_Params.Static.SpellParamData.Base_Casts_Max);
+                    var growth = GetRandomByte(ScramblerData_Params.Static.SpellParamData.Cast_Growth_Rate_Min, ScramblerData_Params.Static.SpellParamData.Cast_Growth_Rate_Max);
+
+                    row["casts_tier_1"].Value = (byte)base_casts;
+                    row["casts_tier_2"].Value = (byte)(base_casts + growth);
+                    row["casts_tier_3"].Value = (byte)(base_casts + (growth * 2));
+                    row["casts_tier_4"].Value = (byte)(base_casts + (growth * 3));
+                    row["casts_tier_5"].Value = (byte)(base_casts + (growth * 4));
+                    row["casts_tier_6"].Value = (byte)(base_casts + (growth * 5));
+                    row["casts_tier_7"].Value = (byte)(base_casts + (growth * 6));
+                    row["casts_tier_8"].Value = (byte)(base_casts + (growth * 7));
+                    row["casts_tier_9"].Value = (byte)(base_casts + (growth * 8));
+                    row["casts_tier_10"].Value = (byte)(base_casts + (growth * 9));
                 }
             }
 
-            if (unassigned_list != null && value != null)
-                unassigned_list.Remove(value);
-        }
-
-        public bool HasMatchingLot(List<int> list, PARAM.Row row)
-        {
-            bool match = false;
-
-            for (int slot = 0; slot <= 9; slot++)
+            // Tweaks
+            if (c_Tweak_SpellParam_RemoveStatRequirements)
             {
-                if (list.Contains((int)row[$"item_lot_{slot}"].Value))
-                    match = true;
+                List<PARAM.Row> rows = SpellParam.Where(row =>
+                row.ID >= ScramblerData_Items.Static.SpellParam_Category_Start &&
+                row.ID <= ScramblerData_Items.Static.SpellParam_Category_End
+                ).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["int_requirement"].Value = 0;
+                    row["fth_requirement"].Value = 0;
+                }
             }
 
-            return match;
+            return regulation;
         }
 
-        public bool HasMatchingShopLot(List<int> list, PARAM.Row row)
+        public void AssignRandomCast(string field, List<PARAM.Row> rows)
         {
-            bool match = false;
+            List<int> new_list = new List<int>();
 
-            for (int slot = 0; slot <= 9; slot++)
+            // Build list of possible values
+            foreach (PARAM.Row row in rows)
             {
-                if (list.Contains((int)row[$"equip_id"].Value))
-                    match = true;
+                foreach (PARAM.Cell cell in row.Cells)
+                {
+                    if (cell.Def.InternalName == field)
+                    {
+                        new_list.Add((int)cell.Value);
+                    }
+                }
             }
 
-            return match;
+            // Assign new
+            foreach (PARAM.Row row in rows)
+            {
+                foreach (PARAM.Cell cell in row.Cells)
+                {
+                    if (cell.Def.InternalName == field)
+                    {
+                        cell.Value = new_list[rand.Next(new_list.Count)];
+                    }
+                }
+            }
         }
 
-        public void SelectUniqueItemForShoplot(PARAM.Row row)
+        public Regulation Scramble_BulletParams(
+            bool c_Bullet_IncludePlayer,
+            bool c_Bullet_IncludeEnemy,
+            bool c_Bullet_IncludeBoss,
+            bool c_Bullet_IncludeTraps,
+            bool c_Bullet_VFX,
+            bool c_Bullet_Movement,
+            bool c_Bullet_Angle,
+            bool c_Bullet_SpawnDistance,
+            bool c_Bullet_Duration,
+            bool c_Bullet_Tracking,
+            bool c_Bullet_Effect,
+            bool c_Bullet_Count
+        )
         {
-            Random rand = new Random();
+            List<PARAM.Row> BulletParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"BulletParam")).ToList()[0].Rows;
+            List<PARAM.Row> EnemyBulletParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"EnemyBulletParam")).ToList()[0].Rows;
+            List<PARAM.Row> SystemBulletParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"SystemBulletParam")).ToList()[0].Rows;
 
+            if(c_Bullet_IncludePlayer)
+            {
+                List<PARAM.Row> rows = BulletParam;
+
+                Scramble_Bullets(rows,
+                c_Bullet_VFX,
+                c_Bullet_Movement,
+                c_Bullet_Angle,
+                c_Bullet_SpawnDistance,
+                c_Bullet_Duration,
+                c_Bullet_Tracking,
+                c_Bullet_Effect,
+                c_Bullet_Count);
+            }
+            if (c_Bullet_IncludeEnemy)
+            {
+                List<PARAM.Row> rows = EnemyBulletParam;
+                rows = Util.GetRowsFromSubMatch(rows, ScramblerData_Core.Static.Boss_EnemyParamID_List, 2, 4, "1", false);
+
+                Scramble_Bullets(rows,
+                c_Bullet_VFX,
+                c_Bullet_Movement,
+                c_Bullet_Angle,
+                c_Bullet_SpawnDistance,
+                c_Bullet_Duration,
+                c_Bullet_Tracking,
+                c_Bullet_Effect,
+                c_Bullet_Count);
+            }
+            if (c_Bullet_IncludeBoss)
+            {
+                List<PARAM.Row> rows = EnemyBulletParam;
+                rows = Util.GetRowsFromSubMatch(rows, ScramblerData_Core.Static.Boss_EnemyParamID_List, 2, 4, "1", true);
+
+                Scramble_Bullets(rows,
+                c_Bullet_VFX,
+                c_Bullet_Movement,
+                c_Bullet_Angle,
+                c_Bullet_SpawnDistance,
+                c_Bullet_Duration,
+                c_Bullet_Tracking,
+                c_Bullet_Effect,
+                c_Bullet_Count);
+            }
+            if (c_Bullet_IncludeTraps)
+            {
+                List<PARAM.Row> rows = SystemBulletParam.Where(row => row.ID <= 220100700).ToList();
+
+                Scramble_Bullets(rows,
+                c_Bullet_VFX,
+                c_Bullet_Movement,
+                c_Bullet_Angle,
+                c_Bullet_SpawnDistance,
+                c_Bullet_Duration,
+                c_Bullet_Tracking,
+                c_Bullet_Effect,
+                c_Bullet_Count);
+            }
+
+            return regulation;
+        }
+
+        public void Scramble_Bullets(
+            List<PARAM.Row> rows,
+            bool c_Bullet_VFX,
+            bool c_Bullet_Movement,
+            bool c_Bullet_Angle,
+            bool c_Bullet_SpawnDistance,
+            bool c_Bullet_Duration,
+            bool c_Bullet_Tracking,
+            bool c_Bullet_Effect,
+            bool c_Bullet_Count
+        )
+        {
+            if (c_Bullet_VFX)
+            {
+                foreach (PARAM.Row row in rows)
+                {
+                    row["sfx_id"].Value = ScramblerData_Core.Static.FFX_List[rand.Next(ScramblerData_Core.Static.FFX_List.Count)];
+                    row["hit_sfx_id"].Value = ScramblerData_Core.Static.FFX_List[rand.Next(ScramblerData_Core.Static.FFX_List.Count)];
+                    row["expire_sfx_id"].Value = ScramblerData_Core.Static.FFX_List[rand.Next(ScramblerData_Core.Static.FFX_List.Count)];
+                }
+            }
+            if(c_Bullet_Movement)
+            {
+                foreach (PARAM.Row row in rows)
+                {
+                    row["initial_horizontal_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Initial_Horizontal_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Initial_Horizontal_Velocity_Max);
+                    row["horizontal_acceleration_start_delay"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Horizontal_Acceleration_Start_Delay_Min, ScramblerData_Params.Static.ProjectileParamData.Horizontal_Acceleration_Start_Delay_Max);
+                    row["horizontal_target_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Target_Horizontal_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Target_Horizontal_Velocity_Max);
+                    row["horizontal_max_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Horizontal_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Horizontal_Velocity_Max);
+                    row["initial_vertical_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Initial_Vertical_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Initial_Vertical_Velocity_Max);
+                    row["vertical_acceleration_start_delay"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Vertical_Acceleration_Start_Delay_Min, ScramblerData_Params.Static.ProjectileParamData.Vertical_Acceleration_Start_Delay_Max);
+                    row["vertical_target_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Target_Vertical_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Target_Vertical_Velocity_Max);
+                    row["vertical_max_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Vertical_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Vertical_Velocity_Max);
+                    row["initial_tan_vertical_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Initial_Tan_Vertical_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Initial_Tan_Vertical_Velocity_Max);
+                    row["tan_vertical_acceleration_start_delay"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Tan_Vertical_Acceleration_Start_Delay_Min, ScramblerData_Params.Static.ProjectileParamData.Tan_Vertical_Acceleration_Start_Delay_Max);
+                    row["tan_vertical_target_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Target_Tan_Vertical_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Target_Tan_Vertical_Velocity_Max);
+                    row["tan_vertical_max_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Tan_Vertical_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Tan_Vertical_Velocity_Max);
+                    row["initial_tan_horizontal_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Initial_Tan_Horizontal_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Initial_Tan_Horizontal_Velocity_Max);
+                    row["tan_horizontal_acceleration_start_delay"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Tan_Horizontal_Acceleration_Start_Delay_Min, ScramblerData_Params.Static.ProjectileParamData.Tan_Horizontal_Acceleration_Start_Delay_Max);
+                    row["tan_horizontal_target_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Target_Tan_Horizontal_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Target_Tan_Horizontal_Velocity_Max);
+                    row["tan_horizontal_max_velocity"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Tan_Horizontal_Velocity_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Tan_Horizontal_Velocity_Max);
+                }
+            }
+            if(c_Bullet_Angle)
+            {
+                foreach (PARAM.Row row in rows)
+                {
+                    row["shooter_horizontal_angle"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Shooter_Horizontal_Angle_Min, ScramblerData_Params.Static.ProjectileParamData.Shooter_Horizontal_Angle_Max);
+                    row["shooter_unknown_angle_0"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Shooter_Unk0_Angle_Min, ScramblerData_Params.Static.ProjectileParamData.Shooter_Unk0_Angle_Max);
+                    row["shooter_vertical_angle"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Shooter_Vertical_Angle_Min, ScramblerData_Params.Static.ProjectileParamData.Shooter_Vertical_Angle_Max);
+                    row["shooter_unknown_angle_1"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Shooter_Unk1_Angle_Min, ScramblerData_Params.Static.ProjectileParamData.Shooter_Unk1_Angle_Max);
+                    row["vertical_angle_randomizer"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Vertical_Angle_Randomizer_Min, ScramblerData_Params.Static.ProjectileParamData.Vertical_Angle_Randomizer_Max);
+                    row["horizontal_angle_randomizer"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Horizontal_Angle_Randomizer_Min, ScramblerData_Params.Static.ProjectileParamData.Horizontal_Angle_Randomizer_Max);
+                    row["vertical_spread"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Vertical_Spread_Min, ScramblerData_Params.Static.ProjectileParamData.Vertical_Spread_Max);
+                    row["horizontal_spread"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Horizontal_Spread_Min, ScramblerData_Params.Static.ProjectileParamData.Horizontal_Spread_Max);
+                }
+            }
+            if(c_Bullet_SpawnDistance)
+            {
+                foreach (PARAM.Row row in rows)
+                {
+                    row["vertical_spawn_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Vertical_Spawn_Distance_Min, ScramblerData_Params.Static.ProjectileParamData.Vertical_Spawn_Distance_Max);
+                    row["unknown_spawn_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Unk_Spawn_Distance_Min, ScramblerData_Params.Static.ProjectileParamData.Unk_Spawn_Distance_Max);
+                    row["horizontal_spawn_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Horizontal_Spawn_Distance_Min, ScramblerData_Params.Static.ProjectileParamData.Horizontal_Spawn_Distance_Max);
+                }
+            }
+            if(c_Bullet_Duration)
+            {
+                foreach (PARAM.Row row in rows)
+                {
+                    row["max_life"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Life_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Life_Max);
+                }
+            }
+            if(c_Bullet_Tracking)
+            {
+                foreach (PARAM.Row row in rows)
+                {
+                    row["max_angle_change"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Angle_Change_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Angle_Change_Max);
+                    row["max_tracking_angle_change"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Tracking_Angle_Change_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Tracking_Angle_Change_Max);
+                    row["max_tracking_time"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Max_Tracking_Time_Min, ScramblerData_Params.Static.ProjectileParamData.Max_Tracking_Time_Max);
+                }
+            }
+            if(c_Bullet_Effect)
+            {
+                List<int> list = new List<int>();
+
+                if (ScramblerData_Params.Static.ProjectileParamData.Include_Weapon_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Weapon_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ProjectileParamData.Include_Armor_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Armor_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ProjectileParamData.Include_Ring_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Ring_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ProjectileParamData.Include_Item_Action_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Action_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ProjectileParamData.Include_Item_Soul_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Soul_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ProjectileParamData.Include_Item_Warp_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Warp_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+                if (ScramblerData_Params.Static.ProjectileParamData.Include_Item_Misc_Effects == 1)
+                {
+                    foreach (int entry in ScramblerData_Core.Static.Item_Misc_SpEffect_ID_List)
+                    {
+                        list.Add(entry);
+                    }
+                }
+
+                foreach (PARAM.Row row in rows)
+                {
+                    if (list.Count > 0)
+                    {
+                        var result = list[rand.Next(list.Count)];
+
+                        if (rand.Next(100) <= ScramblerData_Params.Static.ProjectileParamData.Effect_Application_Chance) // Only apply to 25% of bullets
+                            row["speffect_on_shoot"].Value = result;
+                        else
+                            row["speffect_on_shoot"].Value = 0;
+                    }
+                }
+            }
+            if (c_Bullet_Count)
+            {
+                foreach (PARAM.Row row in rows)
+                {
+                    row["shoot_count"].Value = GetRandomByte(ScramblerData_Params.Static.ProjectileParamData.Shoot_Count_Min, ScramblerData_Params.Static.ProjectileParamData.Shoot_Count_Max);
+                    row["shoot_sequential_count"].Value = GetRandomByte(ScramblerData_Params.Static.ProjectileParamData.Shoot_Sequential_Count_Min, ScramblerData_Params.Static.ProjectileParamData.Shoot_Sequential_Count_Max);
+                    row["shoot_interval"].Value = GetRandomFloat(ScramblerData_Params.Static.ProjectileParamData.Shoot_Interval_Min, ScramblerData_Params.Static.ProjectileParamData.Shoot_Interval_Max);
+                }
+            }
+        }
+
+        public Regulation Scramble_PlayerParams(
+            bool c_PlayerStatusParam_StartingAttributes,
+            bool c_PlayerStatusParam_StartingEquipment,
+            bool c_PlayerStatusParam_StartingGifts,
+            bool c_PlayerLevelUpSoulsParam_LevelupCost,
+            bool c_EventCommonParam_ShrineOfWinter_Cost,
+            bool c_BossBattleParam_BossSoulDrops,
+            bool c_LockOnParam_CameraDistance,
+            bool c_LockOnParam_CameraFOV,
+            bool c_ChrMoveParam_Walk,
+            bool c_ChrMoveParam_Run,
+            bool c_ChrMoveParam_Jump,
+            bool c_ChrMoveParam_Ladder,
+            bool c_ChrMoveParam_Turn,
+            bool c_ChrMoveParam_Evasion,
+            bool c_Tweak_AnyEquipmentForStartingEquipment,
+            bool c_Tweak_BigJumpMode
+        )
+        {
+            List<PARAM.Row> PlayerStatusParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"PlayerStatusParam")).ToList()[0].Rows;
+            List<PARAM.Row> PlayerLevelUpSoulsParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"PlayerLevelUpSoulsParam")).ToList()[0].Rows;
+            List<PARAM.Row> EventCommonParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"EventCommonParam")).ToList()[0].Rows;
+            List<PARAM.Row> BossBattleParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"BossBattleParam")).ToList()[0].Rows;
+            List<PARAM.Row> LockOnParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"LockOnParam")).ToList()[0].Rows;
+            List<PARAM.Row> ChrMoveParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"ChrMoveParam")).ToList()[0].Rows;
+
+            if(c_PlayerStatusParam_StartingAttributes)
+            {
+                List<PARAM.Row> rows = PlayerStatusParam.Where(row => row.ID >= 20 && row.ID <= 100).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    RandomiseClassStats(row);
+                }
+            }
+            if (c_PlayerStatusParam_StartingEquipment)
+            {
+                List<PARAM.Row> rows = PlayerStatusParam.Where(row => row.ID >= 20 && row.ID <= 100).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    RandomiseClassEquipment(row, c_Tweak_AnyEquipmentForStartingEquipment);
+                }
+            }
+            if (c_PlayerStatusParam_StartingGifts)
+            {
+                List<PARAM.Row> rows = PlayerStatusParam.Where(row => row.ID >= 510 && row.ID <= 570).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    RandomiseGift(row);
+                }
+            }
+            if (c_PlayerLevelUpSoulsParam_LevelupCost)
+            {
+                List<PARAM.Row> rows = PlayerLevelUpSoulsParam;
+
+                var base_min = GetRandomInt(ScramblerData_Params.Static.PlayerParamData.Base_Level_Up_Cost_Min, ScramblerData_Params.Static.PlayerParamData.Base_Level_Up_Cost_Max);
+                var base_max = GetRandomInt(ScramblerData_Params.Static.PlayerParamData.Max_Level_Up_Cost_Min, ScramblerData_Params.Static.PlayerParamData.Max_Level_Up_Cost_Max);
+                var growth = (base_max / 850);
+
+                var current_value = base_min;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["soul_level_cost"].Value = current_value;
+
+                    current_value = current_value + growth;
+                }
+            }
+            if (c_EventCommonParam_ShrineOfWinter_Cost)
+            {
+                List<PARAM.Row> rows = EventCommonParam.Where(row => row.ID == 14).ToList();
+
+                foreach(PARAM.Row row in rows)
+                {
+                    row["event_value"].Value = GetRandomInt(ScramblerData_Params.Static.PlayerParamData.Shrine_of_Winter_Unlock_Amount_Min, ScramblerData_Params.Static.PlayerParamData.Shrine_of_Winter_Unlock_Amount_Max);
+                }
+            }
+            if (c_BossBattleParam_BossSoulDrops)
+            {
+                List<PARAM.Row> rows = BossBattleParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["souls"].Value = GetRandomUInt(ScramblerData_Params.Static.PlayerParamData.Boss_Soul_Drop_Amount_Min, ScramblerData_Params.Static.PlayerParamData.Boss_Soul_Drop_Amount_Max);
+                }
+            }
+            if (c_LockOnParam_CameraDistance)
+            {
+                List<PARAM.Row> rows = LockOnParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["max_dist_behind_player"].Value = (1 + rand.NextDouble() * GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Camera_Distance_Behind_Player_Min, ScramblerData_Params.Static.PlayerParamData.Camera_Distance_Behind_Player_Max));
+                }
+            }
+            if (c_LockOnParam_CameraFOV)
+            {
+                List<PARAM.Row> rows = LockOnParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["fov_0"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Cameria_Horizontal_FOV_Min, ScramblerData_Params.Static.PlayerParamData.Cameria_Horizontal_FOV_Max);
+                    row["fov_1"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Cameria_Vertical_FOV_Min, ScramblerData_Params.Static.PlayerParamData.Cameria_Vertical_FOV_Max);
+                }
+            }
+            if (c_ChrMoveParam_Walk)
+            {
+                List<PARAM.Row> rows = ChrMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["walk_acceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Walk_Acceleration_Min, ScramblerData_Params.Static.PlayerParamData.Walk_Acceleration_Max);
+                    row["walk_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Walk_Speed_Min, ScramblerData_Params.Static.PlayerParamData.Walk_Speed_Max);
+                    row["walk_deceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Walk_Deceleration_Min, ScramblerData_Params.Static.PlayerParamData.Walk_Deceleration_Max);
+                    row["lock_on_walk_acceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Walk_LockOn_Acceleration_Min, ScramblerData_Params.Static.PlayerParamData.Walk_LockOn_Acceleration_Max);
+                    row["lock_on_walk_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Walk_LockOn_Speed_Min, ScramblerData_Params.Static.PlayerParamData.Walk_LockOn_Speed_Max);
+                    row["lock_on_walk_deceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Walk_LockOn_Deceleration_Min, ScramblerData_Params.Static.PlayerParamData.Walk_LockOn_Deceleration_Max);
+                }
+            }
+            if (c_ChrMoveParam_Run)
+            {
+                List<PARAM.Row> rows = ChrMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["run_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Run_Speed_Min, ScramblerData_Params.Static.PlayerParamData.Run_Speed_Max);
+                    row["run_acceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Run_Acceleration_Min, ScramblerData_Params.Static.PlayerParamData.Run_Acceleration_Max);
+                    row["run_to_walk_deceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Run_Deceleration_Min, ScramblerData_Params.Static.PlayerParamData.Run_Deceleration_Max);
+                    row["lock_on_run_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Run_LockOn_Speed_Min, ScramblerData_Params.Static.PlayerParamData.Run_LockOn_Speed_Max);
+                    row["lock_on_run_acceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Run_LockOn_Acceleration_Min, ScramblerData_Params.Static.PlayerParamData.Run_LockOn_Acceleration_Max);
+                    row["lock_on_run_to_walk_deceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Run_LockOn_Deceleration_Min, ScramblerData_Params.Static.PlayerParamData.Run_LockOn_Deceleration_Max);
+                }
+            }
+            if (c_ChrMoveParam_Jump)
+            {
+                List<PARAM.Row> rows = ChrMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["jump_height"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Height_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Height_Max);
+                    row["Unk51"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Unk51_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Unk51_Max);
+                    row["Unk52"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Unk52_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Unk52_Max);
+                    row["jump_length_min"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Length_Minimum_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Length_Minimum_Max);
+                    row["jump_length_max"].Value = ((float)row["jump_length_min"].Value * GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Length_Maximum_Multiplier_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Length_Maximum_Multiplier_Max));
+                    row["Unk53"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Unk53_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Unk53_Max);
+                    row["Unk54"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Unk54_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Unk54_Max);
+                    row["jump_gravity_min"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Gravity_Minimum_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Gravity_Minimum_Max);
+                    row["jump_gravity_max"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Gravity_Maximum_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Gravity_Maximum_Max);
+                    row["Unk55"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Unk55_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Unk55_Max);
+                    row["Unk56"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Unk56_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Unk56_Max);
+                    row["Unk57"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Jump_Unk57_Min, ScramblerData_Params.Static.PlayerParamData.Jump_Unk57_Max);
+
+                    // Adjust these so the player doesn't just die when they jump high
+                    row["fall_distance_breakpoint_1"].Value = ((float)row["jump_height"].Value * 1.2);
+                    row["fall_distance_breakpoint_2"].Value = ((float)row["jump_height"].Value * 1.4);
+                    row["fall_distance_breakpoint_3"].Value = ((float)row["jump_height"].Value * 1.6);
+                    row["fall_distance_max"].Value = ((float)row["jump_height"].Value * 2);
+                }
+            }
+            if (c_ChrMoveParam_Ladder)
+            {
+                List<PARAM.Row> rows = ChrMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["ladder_climb_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Climb_Ladder_Speed_Min, ScramblerData_Params.Static.PlayerParamData.Climb_Ladder_Speed_Max);
+                    row["ladder_fast_climb_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Climb_Ladder_Fast_Speed_Min, ScramblerData_Params.Static.PlayerParamData.Climb_Ladder_Fast_Speed_Max);
+                    row["ladder_slide_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Climb_Ladder_Slide_Speed_Min, ScramblerData_Params.Static.PlayerParamData.Climb_Ladder_Slide_Speed_Max);
+                    row["Unk107"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Climb_Unk107_Min, ScramblerData_Params.Static.PlayerParamData.Climb_Unk107_Max);
+                    row["Unk108"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Climb_Unk108_Min, ScramblerData_Params.Static.PlayerParamData.Climb_Unk108_Max);
+                }
+            }
+            if (c_ChrMoveParam_Turn)
+            {
+                List<PARAM.Row> rows = ChrMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["slow_walk_turn_rate"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Slow_Walk_Turn_Rate_Min, ScramblerData_Params.Static.PlayerParamData.Slow_Walk_Turn_Rate_Max);
+                    row["walk_turn_rate"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Walk_Turn_Rate_Min, ScramblerData_Params.Static.PlayerParamData.Walk_Turn_Rate_Max);
+                    row["Unk08"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Unk08_Turn_Rate_Min, ScramblerData_Params.Static.PlayerParamData.Unk08_Turn_Rate_Max);
+                    row["Unk09"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Unk09_Turn_Rate_Min, ScramblerData_Params.Static.PlayerParamData.Unk09_Turn_Rate_Max);
+                    row["Unk12"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Unk12_Turn_Rate_Min, ScramblerData_Params.Static.PlayerParamData.Unk12_Turn_Rate_Max);
+                    row["Unk13"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Unk13_Turn_Rate_Min, ScramblerData_Params.Static.PlayerParamData.Unk13_Turn_Rate_Max);
+                    row["Unk14"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Unk14_Turn_Rate_Min, ScramblerData_Params.Static.PlayerParamData.Unk14_Turn_Rate_Max);
+                    row["Unk15"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Unk15_Turn_Rate_Min, ScramblerData_Params.Static.PlayerParamData.Unk15_Turn_Rate_Max);
+                    row["lock_on_walk_turn_rate"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Walk_LockOn_Turn_Rate_Min, ScramblerData_Params.Static.PlayerParamData.Walk_LockOn_Turn_Rate_Max);
+                }
+            }
+            if (c_ChrMoveParam_Evasion)
+            {
+                List<PARAM.Row> rows = ChrMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["backstep_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Backstep_Speed_Min, ScramblerData_Params.Static.PlayerParamData.Backstep_Speed_Max);
+                    row["backstep_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Backstep_Distance_Min, ScramblerData_Params.Static.PlayerParamData.Backstep_Distance_Max);
+                    row["roll_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Roll_Speed_Min, ScramblerData_Params.Static.PlayerParamData.Roll_Speed_Max);
+                    row["Unk45"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Unk45_Min, ScramblerData_Params.Static.PlayerParamData.Unk45_Max);
+                    row["Unk47"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Unk47_Min, ScramblerData_Params.Static.PlayerParamData.Unk47_Max);
+                    row["Unk49"].Value = GetRandomFloat(ScramblerData_Params.Static.PlayerParamData.Unk49_Min, ScramblerData_Params.Static.PlayerParamData.Unk49_Max);
+                }
+            }
+            if (c_Tweak_BigJumpMode)
+            {
+                List<PARAM.Row> rows = ChrMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["jump_height"].Value = ScramblerData_Params.Static.PlayerParamData.BigJump_Jump_Height;
+                    row["jump_length_min"].Value = ScramblerData_Params.Static.PlayerParamData.BigJump_Jump_Length_Minimum;
+                    row["jump_length_max"].Value = ScramblerData_Params.Static.PlayerParamData.BigJump_Jump_Length_Maximum;
+                    row["jump_gravity_min"].Value = ScramblerData_Params.Static.PlayerParamData.BigJumpJump_Gravity_Minimum;
+                    row["jump_gravity_max"].Value = ScramblerData_Params.Static.PlayerParamData.BigJumpJump_Gravity_Maximum;
+                    row["Unk55"].Value = ScramblerData_Params.Static.PlayerParamData.BigJump_Unk55;
+                    row["Unk56"].Value = ScramblerData_Params.Static.PlayerParamData.BigJump_Unk56;
+                    row["Unk57"].Value = ScramblerData_Params.Static.PlayerParamData.BigJump_Unk57;
+
+                    // Adjust these so the player doesn't just die when they jump high
+                    row["fall_distance_breakpoint_1"].Value = ((float)row["jump_height"].Value * 1.2);
+                    row["fall_distance_breakpoint_2"].Value = ((float)row["jump_height"].Value * 1.4);
+                    row["fall_distance_breakpoint_3"].Value = ((float)row["jump_height"].Value * 1.6);
+                    row["fall_distance_max"].Value = ((float)row["jump_height"].Value * 2);
+                }
+            }
+
+            return regulation;
+        }
+
+        public void RandomiseClassStats(PARAM.Row row)
+        {
+            int statSkew = ScramblerData_Params.Static.PlayerParamData.Class_Attributes_Stat_Spread;
+
+            ushort vigor = GetRandomStat(row, "vigor", statSkew);
+            ushort endurance = GetRandomStat(row, "endurance", statSkew);
+            ushort attunement = GetRandomStat(row, "attunement", statSkew);
+            ushort vitality = GetRandomStat(row, "vitality", statSkew);
+            ushort strength = GetRandomStat(row, "strength", statSkew);
+            ushort dexterity = GetRandomStat(row, "dexterity", statSkew);
+            ushort intelligence = GetRandomStat(row, "intelligence", statSkew);
+            ushort faith = GetRandomStat(row, "faith", statSkew);
+            ushort adaptability = GetRandomStat(row, "adaptability", statSkew);
+
+            ushort total = (ushort)((vigor + endurance + attunement + vitality + strength + dexterity + intelligence + faith + adaptability) - 54);
+
+            if (total < 1)
+                total = 1;
+
+            row["soul_level"].Value = total;
+            row["vigor"].Value = vigor;
+            row["endurance"].Value = endurance;
+            row["attunement"].Value = attunement;
+            row["vitality"].Value = vitality;
+            row["strength"].Value = strength;
+            row["dexterity"].Value = dexterity;
+            row["intelligence"].Value = intelligence;
+            row["faith"].Value = faith;
+            row["adaptability"].Value = adaptability;
+        }
+
+        public ushort GetRandomStat(PARAM.Row row, string stat, int statSkew)
+        {
+            ushort adjust = (ushort)statSkew;
+
+            ushort stat_value = (ushort)row[stat].Value;
+
+            ushort lower = (ushort)(stat_value - adjust);
+            ushort upper = (ushort)(stat_value + adjust);
+
+
+            if (lower > upper)
+                lower = (ushort)(upper - 1);
+
+            if (lower < 1)
+                lower = 1;
+
+            if (upper < lower)
+                upper = (ushort)(lower + 1);
+
+            return (ushort)rand.Next(lower, upper);
+        }
+
+        public void RandomiseGift(PARAM.Row row)
+        {
             int roll = rand.Next(100);
 
-            int item_lot_value = (int)row[$"equip_id"].Value;
+            // Clean up current values
+            row["ring_item_1"].Value = -1;
 
-            // If Retain Shop Spread in on, fix the rolls so the current item is swapped for the same type
-            if (T_Retain_Shop_Spread)
+            for (int x = 1; x < 10; x++)
             {
-                if (Data.Row_List_Weapons.Any(r => r.ID == item_lot_value))
-                    roll = 0;
-
-                if (Data.Row_List_Spells.Any(r => r.ID == item_lot_value))
-                    roll = 50;
-
-                if (Data.Row_List_Rings.Any(r => r.ID == item_lot_value))
-                    roll = 75;
+                row[$"item_{x}"].Value = -1;
+                row[$"item_amount_{x}"].Value = 0;
             }
 
-            // Weapon
-            if (roll >= 0 && roll < 50)
+            // Ring
+            if (roll <= 25)
             {
-                Util.PrintLine($"Selected unique item for shop: Weapon");
-                AddItemToShoplot(row, Data.Row_List_Weapons, 255, 255);
+                Util.SetRandomItem(row, "ring_item_1", Data.Row_List_Rings);
             }
-            // Spells
-            else if (roll >= 50 && roll < 75)
-            {
-                Util.PrintLine($"Selected unique item for shop: Spell");
-                AddItemToShoplot(row, Data.Row_List_Spells, 255, 255);
-            }
-            // Rings
-            else if (roll >= 75)
-            {
-                Util.PrintLine($"Selected unique item for shop: Ring");
-                AddItemToShoplot(row, Data.Row_List_Rings, 255, 255);
-            }
-        }
-
-        public void SelectItemForShoplot(PARAM.Row row)
-        {
-            Random rand = new Random();
-
-            int roll = rand.Next(100);
-            int inf_roll = rand.Next(100);
-
-            int item_lot_value = (int)row[$"equip_id"].Value;
-
-            // If Retain Shop Spread in on, fix the rolls so the current item is swapped for the same type
-            if (T_Retain_Shop_Spread)
-            {
-                if (Data.Row_List_Weapons.Any(r => r.ID == item_lot_value))
-                    roll = 0;
-
-                if (Data.Row_List_Armor.Any(r => r.ID == item_lot_value))
-                    roll = 10;
-
-                if (Data.Row_List_Spells.Any(r => r.ID == item_lot_value))
-                    roll = 20;
-
-                if (Data.Row_List_Rings.Any(r => r.ID == item_lot_value))
-                    roll = 30;
-
-                if (Data.Row_List_Ammunition.Any(r => r.ID == item_lot_value))
-                    roll = 40;
-
-                if (Data.Row_List_Materials.Any(r => r.ID == item_lot_value))
-                    roll = 45;
-
-                if (Data.Row_List_Soul_Consumables.Any(r => r.ID == item_lot_value))
-                    roll = 55;
-
-                if (Data.Row_List_Throwable_Consumable.Any(r => r.ID == item_lot_value))
-                    roll = 60;
-
-                if (Data.Row_List_Bird_Consumables.Any(r => r.ID == item_lot_value))
-                    roll = 65;
-
-                if (Data.Row_List_Spell_Upgrades.Any(r => r.ID == item_lot_value))
-                    roll = 70;
-
-                if (Data.Row_List_HP_Consumables.Any(r => r.ID == item_lot_value))
-                    roll = 75;
-
-                if (Data.Row_List_Cast_Consumables.Any(r => r.ID == item_lot_value))
-                    roll = 85;
-
-                if (Data.Row_List_Flask_Upgrades.Any(r => r.ID == item_lot_value))
-                    roll = 90;
-
-                if (Data.Row_List_Misc_Consumable.Any(r => r.ID == item_lot_value))
-                    roll = 95;
-            }
-
-            // Weapon
-            if (roll >= 0 && roll < 10)
-            {
-                Util.PrintLine($"Selected item for shop: Weapon");
-
-                AddItemToShoplot(row, Data.Row_List_Weapons, 255, 255);
-            }
-            // Armor
-            else if (roll >= 10 && roll < 20)
-            {
-                Util.PrintLine($"Selected item for shop: Armor");
-
-                AddItemToShoplot(row, Data.Row_List_Armor, 255, 255);
-            }
-            // Spells
-            else if (roll >= 20 && roll < 30)
-            {
-                Util.PrintLine($"Selected item for shop: Spell");
-
-                AddItemToShoplot(row, Data.Row_List_Spells, 1, 3);
-            }
-            // Rings
-            else if (roll >= 30 && roll < 40)
-            {
-                Util.PrintLine($"Selected item for shop: Ring");
-
-                AddItemToShoplot(row, Data.Row_List_Rings, 1, 1);
-            }
-            // Item: Ammunition
-            else if (roll >= 40 && roll < 45)
-            {
-                Util.PrintLine($"Selected item for shop: Ammunition");
-
-                AddItemToShoplot(row, Data.Row_List_Ammunition, 255, 255);
-            }
-            // Item: Material
-            else if (roll >= 45 && roll < 55)
-            {
-                Util.PrintLine($"Selected item for shop: Material");
-
-                if (inf_roll >= 80)
-                    AddItemToShoplot(row, Data.Row_List_Materials, 255, 255);
-                else
-                    AddItemToShoplot(row, Data.Row_List_Materials, 5, 10);
-            }
-            // Item: Soul
-            else if (roll >= 55 && roll < 60)
-            {
-                AddItemToShoplot(row, Data.Row_List_Soul_Consumables, 3, 5);
-            }
-            // Item: Throwable
-            else if (roll >= 60 && roll < 65)
-            {
-                Util.PrintLine($"Selected item for shop: Throwable");
-
-                if (inf_roll >= 80)
-                    AddItemToShoplot(row, Data.Row_List_Throwable_Consumable, 255, 255);
-                else
-                    AddItemToShoplot(row, Data.Row_List_Throwable_Consumable, 25, 100);
-            }
-            // Item: Bird
-            else if (roll >= 65 && roll < 70)
-            {
-                Util.PrintLine($"Selected item for shop: Bird");
-
-                if (inf_roll >= 80)
-                    AddItemToShoplot(row, Data.Row_List_Bird_Consumables, 255, 255);
-                else
-                    AddItemToShoplot(row, Data.Row_List_Bird_Consumables, 1, 3);
-            }
-            // Item: Spice
-            else if (roll >= 70 && roll < 75)
-            {
-                Util.PrintLine($"Selected item for shop: Spice");
-
-                if (inf_roll >= 80)
-                    AddItemToShoplot(row, Data.Row_List_Spell_Upgrades, 255, 255);
-                else
-                    AddItemToShoplot(row, Data.Row_List_Spell_Upgrades, 1, 3);
-            }
-            // Item: HP
-            else if (roll >= 75 && roll < 85)
-            {
-                Util.PrintLine($"Selected item for shop: HP");
-
-                if (inf_roll >= 80)
-                    AddItemToShoplot(row, Data.Row_List_HP_Consumables, 255, 255);
-                else
-                    AddItemToShoplot(row, Data.Row_List_HP_Consumables, 3, 10);
-            }
-            // Item: Cast
-            else if (roll >= 85 && roll < 90)
-            {
-                Util.PrintLine($"Selected item for shop: Cast");
-
-                if (inf_roll >= 80)
-                    AddItemToShoplot(row, Data.Row_List_Cast_Consumables, 255, 255);
-                else
-                    AddItemToShoplot(row, Data.Row_List_Cast_Consumables, 3, 10);
-            }
-            // Item: Flask
-            else if (roll >= 90 && roll < 95)
-            {
-                Util.PrintLine($"Selected item for shop: Flask");
-
-                AddItemToShoplot(row, Data.Row_List_Flask_Upgrades, 1, 1);
-            }
-            // Item: Misc
-            else if (roll >= 95)
-            {
-                Util.PrintLine($"Selected item for shop: Misc");
-
-                if (inf_roll >= 80)
-                    AddItemToShoplot(row, Data.Row_List_Misc_Consumable, 255, 255);
-                else
-                    AddItemToShoplot(row, Data.Row_List_Flask_Upgrades, 1, 1);
-            }
-        }
-
-        public void AddItemToShoplot(PARAM.Row row, List<PARAM.Row> itemlist, int min, int max)
-        {
-            Random rand = new Random();
-
-            PARAM.Row value = null;
-
-            value = itemlist[rand.Next(itemlist.Count)];
-
-            Util.PrintLine($"Adding to shoplot: {value.ID}");
-
-            row[$"equip_id"].Value = value.ID;
-
-            if (min > 0 && max > 0)
-                row[$"quantity"].Value = rand.Next(min, max);
-            else if (min == 255 && max == 255)
-                row[$"quantity"].Value = 255;
+            // Good
             else
-                row[$"quantity"].Value = 1;
+            {
+                int endChance = 20;
+
+                // Multiple Items row
+                if (row.ID == 530)
+                    endChance = 0;
+
+                for (int x = 1; x < 10; x++)
+                {
+                    Util.SetRandomGood(row, $"item_{x}", Data, $"item_amount_{x}");
+
+                    endChance = endChance + rand.Next(1, x * 10);
+                    if (endChance > 25)
+                        break;
+                }
+            }
+        }
+
+        List<PARAM.Row> valid_melee_weapons = new List<PARAM.Row>();
+        List<PARAM.Row> valid_sorcery_catalyst = new List<PARAM.Row>();
+        List<PARAM.Row> valid_miracle_catalyst = new List<PARAM.Row>();
+        List<PARAM.Row> valid_pyromancy_catalyst = new List<PARAM.Row>();
+        List<PARAM.Row> valid_hex_catalyst = new List<PARAM.Row>();
+        List<PARAM.Row> valid_bows = new List<PARAM.Row>();
+        List<PARAM.Row> valid_greatbows = new List<PARAM.Row>();
+        List<PARAM.Row> valid_crossbows = new List<PARAM.Row>();
+        List<PARAM.Row> valid_shields = new List<PARAM.Row>();
+        List<PARAM.Row> valid_head_armor = new List<PARAM.Row>();
+        List<PARAM.Row> valid_chest_armor = new List<PARAM.Row>();
+        List<PARAM.Row> valid_arm_armor = new List<PARAM.Row>();
+        List<PARAM.Row> valid_leg_armor = new List<PARAM.Row>();
+        List<PARAM.Row> valid_sorceries = new List<PARAM.Row>();
+        List<PARAM.Row> valid_miracles = new List<PARAM.Row>();
+        List<PARAM.Row> valid_pyromancies = new List<PARAM.Row>();
+        List<PARAM.Row> valid_hexes = new List<PARAM.Row>();
+
+        public bool usesSorceries = false;
+        public bool usesMiracles = false;
+        public bool usesPyromancies = false;
+        public bool usesHexes = false;
+        public bool usesArrows = false;
+        public bool usesGreatarrows = false;
+        public bool usesBolts = false;
+        public bool setFirstSpell = false;
+
+        public void RandomiseClassEquipment(PARAM.Row row, bool allowAnyEquipment)
+        {
+            ushort attunement = (ushort)row["attunement"].Value;
+            ushort vitality = (ushort)row["vitality"].Value;
+            ushort strength = (ushort)row["strength"].Value;
+            ushort dexterity = (ushort)row["dexterity"].Value;
+            ushort intelligence = (ushort)row["intelligence"].Value;
+            ushort faith = (ushort)row["faith"].Value;
+
+            usesSorceries = false;
+            usesMiracles = false;
+            usesPyromancies = false;
+            usesHexes = false;
+            usesArrows = false;
+            usesGreatarrows = false;
+            usesBolts = false;
+            setFirstSpell = false;
+
+            UpdateSelectionListsForClass((int)attunement, (int)vitality, (int)strength, (int)dexterity, (int)intelligence, (int)faith, allowAnyEquipment);
+
+            // Weapons
+            AssignWeaponSlot(row, "right_weapon_item_1", false);
+
+            if (rand.Next(100) >= 50)
+                AssignWeaponSlot(row, "right_weapon_item_2", false);
+
+            if (rand.Next(100) >= 75)
+                AssignWeaponSlot(row, "right_weapon_item_3", false);
+
+            AssignWeaponSlot(row, "left_weapon_item_1", true);
+
+            if (rand.Next(100) >= 50)
+                AssignWeaponSlot(row, "left_weapon_item_2", true);
+
+            if (rand.Next(100) >= 75)
+                AssignWeaponSlot(row, "left_weapon_item_3", true);
+
+            // Spells
+            AssignSpell(row, "spell_item_1");
+
+            if (rand.Next(100) >= 50)
+                AssignSpell(row, "spell_item_2");
+
+            if (rand.Next(100) >= 75)
+                AssignSpell(row, "spell_item_3");
+
+            // Armor
+            AssignArmor(row, "head_item", valid_head_armor);
+            AssignArmor(row, "chest_item", valid_chest_armor);
+            AssignArmor(row, "hands_item", valid_arm_armor);
+            AssignArmor(row, "legs_item", valid_leg_armor);
+
+            // Rings
+            if (rand.Next(100) >= 50)
+                Util.SetRandomItem(row, "ring_item_1", Data.Row_List_Rings);
+
+            // Ammo
+            if (usesArrows)
+                Util.SetRandomItemWithAmount(row, "arrow_item_1", Data.Row_List_Ammunition_Arrow, "arrow_amount_1", 25, 50);
+
+            if (usesGreatarrows)
+                Util.SetRandomItemWithAmount(row, "arrow_item_1", Data.Row_List_Ammunition_Greatarrow, "arrow_amount_1", 25, 50);
+
+            if (usesBolts)
+                Util.SetRandomItemWithAmount(row, "bolt_item_1", Data.Row_List_Ammunition_Bolt, "bolt_amount_1", 25, 50);
+
+            // Starting Item
+            for (int x = 1; x <= 7; x++)
+            {
+                if (rand.Next(100) > 50 || row.ID == 90)
+                    Util.SetRandomGood(row, $"item_{x}", Data, $"item_amount_{x}");
+            }
+        }
+
+        public void AssignArmor(PARAM.Row row, string slot, List<PARAM.Row> armorList)
+        {
+            Random rand = new Random();
+
+            if (armorList.Count > 0)
+            {
+                // Conver the ArmorParam ID to ItemParam ID if required
+                string raw_id = armorList[rand.Next(armorList.Count)].ID.ToString();
+
+                if(raw_id.Substring(0, 1) == "1")
+                {
+                    string new_id = raw_id.Substring(1);
+                    raw_id = $"2{new_id}";
+                }
+
+                row[slot].Value = raw_id;
+            }
+        }
+
+        public void AssignSpell(PARAM.Row row, string slot)
+        {
+            Random rand = new Random();
+
+            int roll = rand.Next(100);
+
+            if (!setFirstSpell)
+            {
+                roll = 25;
+                setFirstSpell = true;
+            }
+
+            // Sorceries
+            if (usesSorceries && valid_sorceries.Count > 0)
+            {
+                if (roll >= 25)
+                {
+                    row[slot].Value = valid_sorceries[rand.Next(valid_sorceries.Count)].ID;
+                    usesSorceries = true;
+                }
+            }
+            // Miracles
+            if (usesMiracles && valid_miracles.Count > 0)
+            {
+                if (roll >= 25)
+                {
+                    row[slot].Value = valid_miracles[rand.Next(valid_miracles.Count)].ID;
+                    usesSorceries = true;
+                }
+            }
+            // Pyromancies
+            if (usesPyromancies && valid_pyromancies.Count > 0)
+            {
+                if (roll >= 25)
+                {
+                    row[slot].Value = valid_pyromancies[rand.Next(valid_pyromancies.Count)].ID;
+                    usesSorceries = true;
+                }
+            }
+            // Hexes
+            if (usesHexes && valid_hexes.Count > 0)
+            {
+                if (roll >= 25)
+                {
+                    row[slot].Value = valid_hexes[rand.Next(valid_hexes.Count)].ID;
+                    usesSorceries = true;
+                }
+            }
+        }
+
+        public void AssignWeaponSlot(PARAM.Row row, string slot, bool allowShields)
+        {
+            Random rand = new Random();
+
+            // Right Weapon 1
+            int roll = rand.Next(100);
+
+            // Caster
+            if (roll >= 66 && !usesSorceries && !usesMiracles && !usesPyromancies && !usesHexes)
+            {
+                roll = rand.Next(100);
+
+                // Sorceries
+                if (roll >= 75 && valid_sorceries.Count > 0 && valid_sorcery_catalyst.Count > 0)
+                {
+                    row[slot].Value = valid_sorcery_catalyst[rand.Next(valid_sorcery_catalyst.Count)].ID;
+                    usesSorceries = true;
+                }
+                // Miracles
+                else if (roll >= 50 && roll < 75 && valid_miracles.Count > 0 && valid_miracle_catalyst.Count > 0)
+                {
+                    row[slot].Value = valid_miracle_catalyst[rand.Next(valid_miracle_catalyst.Count)].ID;
+                    usesMiracles = true;
+                }
+                // Pyromancies
+                else if (roll >= 25 && roll < 50 && valid_pyromancies.Count > 0 && valid_pyromancy_catalyst.Count > 0)
+                {
+                    row[slot].Value = valid_pyromancy_catalyst[rand.Next(valid_pyromancy_catalyst.Count)].ID;
+                    usesPyromancies = true;
+                }
+                // Hexes
+                else if (roll < 25 && valid_hexes.Count > 0 && valid_hex_catalyst.Count > 0)
+                {
+                    row[slot].Value = valid_hex_catalyst[rand.Next(valid_hex_catalyst.Count)].ID;
+                    usesHexes = true;
+                }
+                // Fallback
+                else if(valid_melee_weapons.Count > 0)
+                {
+                    row[slot].Value = valid_melee_weapons[rand.Next(valid_melee_weapons.Count)].ID;
+                }
+                else
+                {
+                    row[slot].Value = Data.Row_List_Weapons_Melee[rand.Next(Data.Row_List_Weapons_Melee.Count)].ID;
+                }
+            }
+            // Ranged
+            else if (roll >= 33 && roll < 66 && !usesArrows && !usesGreatarrows && !usesArrows)
+            {
+                roll = rand.Next(100);
+
+                // Crossbow
+                if (roll >= 66 && valid_crossbows.Count > 0)
+                {
+                    row[slot].Value = valid_crossbows[rand.Next(valid_crossbows.Count)].ID;
+                    usesArrows = true;
+                }
+                // Greatbow
+                else if (roll >= 33 && roll < 66 && valid_greatbows.Count > 0)
+                {
+                    row[slot].Value = valid_greatbows[rand.Next(valid_greatbows.Count)].ID;
+                    usesGreatarrows = true;
+                }
+                // Bow
+                else if (roll < 33 && valid_bows.Count > 0)
+                {
+                    row[slot].Value = valid_bows[rand.Next(valid_bows.Count)].ID;
+                    usesArrows = true;
+                }
+                // Fallback
+                else if (valid_melee_weapons.Count > 0)
+                {
+                    row[slot].Value = valid_melee_weapons[rand.Next(valid_melee_weapons.Count)].ID;
+                }
+                else
+                {
+                    row[slot].Value = Data.Row_List_Weapons_Melee[rand.Next(Data.Row_List_Weapons_Melee.Count)].ID;
+                }
+            }
+            // Melee
+            else
+            {
+                if (allowShields)
+                {
+                    roll = rand.Next(100);
+
+                    if (roll >= 50 && valid_shields.Count > 0)
+                    {
+                        row[slot].Value = valid_shields[rand.Next(valid_shields.Count)].ID;
+                    }
+                    // Fallback
+                    else if (valid_melee_weapons.Count > 0)
+                    {
+                        row[slot].Value = valid_melee_weapons[rand.Next(valid_melee_weapons.Count)].ID;
+                    }
+                    else
+                    {
+                        row[slot].Value = Data.Row_List_Weapons_Melee[rand.Next(Data.Row_List_Weapons_Melee.Count)].ID;
+                    }
+                }
+                // Fallback
+                else if (valid_melee_weapons.Count > 0)
+                {
+                    row[slot].Value = valid_melee_weapons[rand.Next(valid_melee_weapons.Count)].ID;
+                }
+                else
+                {
+                    row[slot].Value = Data.Row_List_Weapons_Melee[rand.Next(Data.Row_List_Weapons_Melee.Count)].ID;
+                }
+            }
+        }
+
+        public void UpdateSelectionListsForClass(int attunement, int vitality, int strength, int dexterity, int intelligence, int faith, bool allowAnyEquipment)
+        {
+            strength = (int)(strength * 1.5);
+
+            if (!allowAnyEquipment)
+            {
+                valid_melee_weapons = Data.Row_List_Weapons_Melee.Where(row =>
+                strength >= (short)row["str_requirement"].Value &&
+                dexterity >= (short)row["dex_requirement"].Value &&
+                intelligence >= (short)row["int_requirement"].Value &&
+                faith >= (short)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_sorcery_catalyst = Data.Row_List_Weapons_Catalyst_Sorcery.Where(row =>
+                strength >= (short)row["str_requirement"].Value &&
+                dexterity >= (short)row["dex_requirement"].Value &&
+                intelligence >= (short)row["int_requirement"].Value &&
+                faith >= (short)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_miracle_catalyst = Data.Row_List_Weapons_Catalyst_Miracles.Where(row =>
+                strength >= (short)row["str_requirement"].Value &&
+                dexterity >= (short)row["dex_requirement"].Value &&
+                intelligence >= (short)row["int_requirement"].Value &&
+                faith >= (short)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_pyromancy_catalyst = Data.Row_List_Weapons_Catalyst_Pyromancy.Where(row =>
+                strength >= (short)row["str_requirement"].Value &&
+                dexterity >= (short)row["dex_requirement"].Value &&
+                intelligence >= (short)row["int_requirement"].Value &&
+                faith >= (short)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_hex_catalyst = Data.Row_List_Weapons_Catalyst_Hex.Where(row =>
+                strength >= (short)row["str_requirement"].Value &&
+                dexterity >= (short)row["dex_requirement"].Value &&
+                intelligence >= (short)row["int_requirement"].Value &&
+                faith >= (short)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_bows = Data.Row_List_Weapons_Bow.Where(row =>
+                strength >= (short)row["str_requirement"].Value &&
+                dexterity >= (short)row["dex_requirement"].Value &&
+                intelligence >= (short)row["int_requirement"].Value &&
+                faith >= (short)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_greatbows = Data.Row_List_Weapons_Greatbow.Where(row =>
+                strength >= (short)row["str_requirement"].Value &&
+                dexterity >= (short)row["dex_requirement"].Value &&
+                intelligence >= (short)row["int_requirement"].Value &&
+                faith >= (short)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_crossbows = Data.Row_List_Weapons_Crossbow.Where(row =>
+                strength >= (short)row["str_requirement"].Value &&
+                dexterity >= (short)row["dex_requirement"].Value &&
+                intelligence >= (short)row["int_requirement"].Value &&
+                faith >= (short)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_shields = Data.Row_List_Weapons_Shield.Where(row =>
+                strength >= (short)row["str_requirement"].Value &&
+                dexterity >= (short)row["dex_requirement"].Value &&
+                intelligence >= (short)row["int_requirement"].Value &&
+                faith >= (short)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_head_armor = Data.Row_List_ActualArmor_Head.Where(row =>
+                strength >= (ushort)row["strength_requirement"].Value &&
+                dexterity >= (ushort)row["dexterity_requirement"].Value &&
+                intelligence >= (ushort)row["intelligence_requirement"].Value &&
+                faith >= (ushort)row["faith_requirement"].Value
+                ).ToList();
+
+                valid_chest_armor = Data.Row_List_ActualArmor_Chest.Where(row =>
+                strength >= (ushort)row["strength_requirement"].Value &&
+                dexterity >= (ushort)row["dexterity_requirement"].Value &&
+                intelligence >= (ushort)row["intelligence_requirement"].Value &&
+                faith >= (ushort)row["faith_requirement"].Value
+                ).ToList();
+
+                valid_arm_armor = Data.Row_List_ActualArmor_Arms.Where(row =>
+                strength >= (ushort)row["strength_requirement"].Value &&
+                dexterity >= (ushort)row["dexterity_requirement"].Value &&
+                intelligence >= (ushort)row["intelligence_requirement"].Value &&
+                faith >= (ushort)row["faith_requirement"].Value
+                ).ToList();
+
+                valid_leg_armor = Data.Row_List_ActualArmor_Legs.Where(row =>
+                strength >= (ushort)row["strength_requirement"].Value &&
+                dexterity >= (ushort)row["dexterity_requirement"].Value &&
+                intelligence >= (ushort)row["intelligence_requirement"].Value &&
+                faith >= (ushort)row["faith_requirement"].Value
+                ).ToList();
+
+                valid_sorceries = Data.Row_List_Spell_Sorceries.Where(row =>
+                intelligence >= (ushort)row["int_requirement"].Value &&
+                faith >= (ushort)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_miracles = Data.Row_List_Spell_Miracles.Where(row =>
+                intelligence >= (ushort)row["int_requirement"].Value &&
+                faith >= (ushort)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_pyromancies = Data.Row_List_Spell_Pyromancies.Where(row =>
+                intelligence >= (ushort)row["int_requirement"].Value &&
+                faith >= (ushort)row["fth_requirement"].Value
+                ).ToList();
+
+                valid_hexes = Data.Row_List_Spell_Hexes.Where(row =>
+                intelligence >= (ushort)row["int_requirement"].Value &&
+                faith >= (ushort)row["fth_requirement"].Value
+                ).ToList();
+            }
+            else
+            {
+                valid_melee_weapons = Data.Row_List_Weapons_Melee;
+                valid_sorcery_catalyst = Data.Row_List_Weapons_Catalyst_Sorcery;
+                valid_miracle_catalyst = Data.Row_List_Weapons_Catalyst_Miracles;
+                valid_pyromancy_catalyst = Data.Row_List_Weapons_Catalyst_Pyromancy;
+                valid_hex_catalyst = Data.Row_List_Weapons_Catalyst_Hex;
+                valid_bows = Data.Row_List_Weapons_Bow;
+                valid_greatbows = Data.Row_List_Weapons_Greatbow;
+                valid_crossbows = Data.Row_List_Weapons_Crossbow;
+                valid_shields = Data.Row_List_Weapons_Shield;
+                valid_head_armor = Data.Row_List_Armor_Head;
+                valid_chest_armor = Data.Row_List_Armor_Chest;
+                valid_arm_armor = Data.Row_List_Armor_Arms;
+                valid_leg_armor = Data.Row_List_Armor_Legs;
+                valid_sorceries = Data.Row_List_Spell_Sorceries;
+                valid_miracles = Data.Row_List_Spell_Miracles;
+                valid_pyromancies = Data.Row_List_Spell_Pyromancies;
+                valid_hexes = Data.Row_List_Spell_Hexes;
+            }
+        }
+
+        public Regulation Scramble_MapParams(
+            bool c_TreasureBoxParam_TrappedChests
+        )
+        {
+            if (c_TreasureBoxParam_TrappedChests)
+            {
+                foreach (ParamWrapper wrapper in regulation.regulationParamWrappers)
+                {
+                    PARAM param = wrapper.Param;
+                    List<PARAM.Row> param_rows = param.Rows;
+
+                    if (wrapper.Name.Contains("treasureboxparam"))
+                    {
+                        foreach (PARAM.Row row in param_rows)
+                        {
+                            bool isTrapped = true;
+
+                            if (rand.Next(100) < ScramblerData_Params.Static.MapParamData.Trapped_Chest_Chance)
+                                isTrapped = false;
+
+                            foreach (PARAM.Cell cell in row.Cells)
+                            {
+                                if (isTrapped)
+                                {
+                                    if (cell.Def.InternalName == "chest_type")
+                                        cell.Value = 1;
+
+                                    if (cell.Def.InternalName == "bullet_id_1")
+                                        cell.Value = 200001030;
+
+                                    if (cell.Def.InternalName == "bullet_id_2")
+                                        cell.Value = 200001130;
+
+                                    if (cell.Def.InternalName == "bullet_id_3")
+                                        cell.Value = 200001330;
+
+                                    if (cell.Def.InternalName == "bullet_id_4")
+                                        cell.Value = 200001230;
+                                }
+                                else
+                                {
+                                    if (cell.Def.InternalName == "chest_type")
+                                        cell.Value = 0;
+
+                                    if (cell.Def.InternalName == "bullet_id_1")
+                                        cell.Value = 0;
+
+                                    if (cell.Def.InternalName == "bullet_id_2")
+                                        cell.Value = 0;
+
+                                    if (cell.Def.InternalName == "bullet_id_3")
+                                        cell.Value = 0;
+
+                                    if (cell.Def.InternalName == "bullet_id_4")
+                                        cell.Value = 0;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return regulation;
+        }
+
+        public Regulation Scramble_CharacterParams(
+            bool c_NpcPlayerStatusParam_Equipment
+        )
+        {
+            List<PARAM.Row> NpcPlayerStatusParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"NpcPlayerStatusParam")).ToList()[0].Rows;
+
+            if (c_NpcPlayerStatusParam_Equipment)
+            {
+                List<PARAM.Row> rows = NpcPlayerStatusParam.Where(row => row.ID >= 6940).ToList();
+
+                foreach (PARAM.Row row in rows)
+                {
+                    Util.SetRandomItem(row, "spell_item_1", Data.Row_List_Spells_NPC);
+                    Util.SetRandomItem(row, "spell_item_2", Data.Row_List_Spells_NPC);
+                    Util.SetRandomItem(row, "spell_item_3", Data.Row_List_Spells_NPC);
+                    Util.SetRandomItem(row, "spell_item_4", Data.Row_List_Spells_NPC);
+                    Util.SetRandomItem(row, "spell_item_5", Data.Row_List_Spells_NPC);
+                    Util.SetRandomItem(row, "spell_item_6", Data.Row_List_Spells_NPC);
+                    Util.SetRandomItem(row, "spell_item_7", Data.Row_List_Spells_NPC);
+                    Util.SetRandomItem(row, "spell_item_8", Data.Row_List_Spells_NPC);
+                    Util.SetRandomItem(row, "spell_item_9", Data.Row_List_Spells_NPC);
+                    Util.SetRandomItem(row, "spell_item_10", Data.Row_List_Spells_NPC);
+
+                    Util.SetRandomItem(row, "right_weapon_item_1", Data.Row_List_Weapons);
+                    Util.SetRandomItem(row, "right_weapon_item_2", Data.Row_List_Weapons);
+
+                    if (rand.Next(100) <= 50)
+                        Util.SetRandomItem(row, "right_weapon_item_3", Data.Row_List_Weapons);
+                    else
+                        row["right_weapon_item_3"].Value = -1;
+
+                    int roll = rand.Next(100);
+
+                    if (roll <= 20)
+                        Util.SetRandomItem(row, "left_weapon_item_1", Data.Row_List_Weapons_Catalyst_Sorcery);
+                    else if (roll > 20 && roll <= 30)
+                        Util.SetRandomItem(row, "left_weapon_item_1", Data.Row_List_Weapons_Catalyst_Miracles);
+                    else if (roll > 30 && roll <= 40)
+                        Util.SetRandomItem(row, "left_weapon_item_1", Data.Row_List_Weapons_Catalyst_Pyromancy);
+                    else if (roll > 40 && roll <= 50)
+                        Util.SetRandomItem(row, "left_weapon_item_1", Data.Row_List_Weapons_Catalyst_Hex);
+                    else if (roll > 50 && roll <= 75)
+                        Util.SetRandomItem(row, "left_weapon_item_1", Data.Row_List_Weapons_Shield);
+                    else
+                        Util.SetRandomItem(row, "left_weapon_item_1", Data.Row_List_Weapons);
+
+                    roll = rand.Next(100);
+
+                    if (roll <= 20)
+                        Util.SetRandomItem(row, "left_weapon_item_2", Data.Row_List_Weapons_Catalyst_Sorcery);
+                    else if (roll > 20 && roll <= 30)
+                        Util.SetRandomItem(row, "left_weapon_item_2", Data.Row_List_Weapons_Catalyst_Miracles);
+                    else if (roll > 30 && roll <= 40)
+                        Util.SetRandomItem(row, "left_weapon_item_2", Data.Row_List_Weapons_Catalyst_Pyromancy);
+                    else if (roll > 40 && roll <= 50)
+                        Util.SetRandomItem(row, "left_weapon_item_2", Data.Row_List_Weapons_Catalyst_Hex);
+                    else if (roll > 50 && roll <= 75)
+                        Util.SetRandomItem(row, "left_weapon_item_2", Data.Row_List_Weapons_Shield);
+                    else
+                        Util.SetRandomItem(row, "left_weapon_item_2", Data.Row_List_Weapons);
+
+                    if (rand.Next(100) < 50)
+                    {
+                        if (roll <= 20)
+                            Util.SetRandomItem(row, "left_weapon_item_3", Data.Row_List_Weapons_Catalyst_Sorcery);
+                        else if (roll > 20 && roll <= 30)
+                            Util.SetRandomItem(row, "left_weapon_item_3", Data.Row_List_Weapons_Catalyst_Miracles);
+                        else if (roll > 30 && roll <= 40)
+                            Util.SetRandomItem(row, "left_weapon_item_3", Data.Row_List_Weapons_Catalyst_Pyromancy);
+                        else if (roll > 40 && roll <= 50)
+                            Util.SetRandomItem(row, "left_weapon_item_3", Data.Row_List_Weapons_Catalyst_Hex);
+                        else if (roll > 50 && roll <= 75)
+                            Util.SetRandomItem(row, "left_weapon_item_3", Data.Row_List_Weapons_Shield);
+                        else
+                            Util.SetRandomItem(row, "left_weapon_item_3", Data.Row_List_Weapons);
+                    }
+
+                    // Armor
+                    Util.SetRandomItem(row, "head_item", Data.Row_List_ActualArmor_Head);
+                    Util.SetRandomItem(row, "chest_item", Data.Row_List_ActualArmor_Chest);
+                    Util.SetRandomItem(row, "hands_item", Data.Row_List_ActualArmor_Arms);
+                    Util.SetRandomItem(row, "legs_item", Data.Row_List_ActualArmor_Legs);
+
+                    // Rings
+                    if (rand.Next(100) < 25)
+                    {
+                        Util.SetRandomItem(row, "ring_item_1", Data.Row_List_Rings);
+                    }
+                }
+            }
+
+            return regulation;
+        }
+
+        public Regulation Scramble_EnemyParams(
+            bool c_Enemy_IncludeBosses,
+            bool c_Enemy_IncludeCharacters,
+            bool c_Enemy_IncludeSummons,
+            bool c_Enemy_IncludeHostileCharacters,
+            bool c_LogicComParam_Detection,
+            bool c_EnemyParam_HP,
+            bool c_EnemyParam_Souls,
+            bool c_EnemyParam_Stamina,
+            bool c_EnemyParam_Defence,
+            bool c_EnemyParam_ShieldDefence,
+            bool c_EnemyParam_Poise,
+            bool c_EnemyDamageParam_Damage,
+            bool c_EnemyDamageParam_Knockback,
+            bool c_EnemyDamageParam_AttackSpeed,
+            bool c_EnemyMoveParam_Walk,
+            bool c_EnemyMoveParam_Run,
+            bool c_EnemyMoveParam_Jump,
+            bool c_EnemyMoveParam_Climb,
+            bool c_EnemyMoveParam_Turn,
+            bool c_EnemyMoveParam_Evasion
+        )
+        {
+            List<PARAM.Row> LogicComParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"LogicComParam")).ToList()[0].Rows;
+            List<PARAM.Row> EnemyParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"EnemyParam")).ToList()[0].Rows;
+            List<PARAM.Row> EnemyDamageParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"EnemyDamageParam")).ToList()[0].Rows;
+            List<PARAM.Row> EnemyMoveParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"EnemyMoveParam")).ToList()[0].Rows;
+            List<PARAM.Row> EnemyBehaviorParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"EnemyBehaviorParam")).ToList()[0].Rows;
+            List<PARAM.Row> EnemyBehaviorSecondParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"EnemyBehaviorSecondParam")).ToList()[0].Rows;
+            List<PARAM.Row> EnemyBehaviorThirdParam = regulation.regulationParamWrappers.Where(n => n.Name == ($"EnemyBehaviorThirdParam")).ToList()[0].Rows;
+
+            // Exclude the test/debug rows.
+            EnemyParam = EnemyParam.Where(row => row.ID >= 100000).ToList();
+            EnemyMoveParam = EnemyMoveParam.Where(row => row.ID >= 100000 && row.ID <= 800010).ToList();
+            EnemyDamageParam = EnemyDamageParam.Where(row => row.ID >= 110000010).ToList();
+            LogicComParam = LogicComParam.Where(row => row.ID >= 100010).ToList();
+
+            // Remove X type rows if the X type has not been included
+            if (!c_Enemy_IncludeBosses)
+            {
+                EnemyParam = EnemyParam.Where(row => !ScramblerData_Core.Static.Boss_EnemyParamID_List.Contains(row.ID)).ToList();
+                EnemyMoveParam = EnemyMoveParam.Where(row => !ScramblerData_Core.Static.Boss_EnemyParamID_List.Contains(row.ID)).ToList();
+                EnemyDamageParam = EnemyDamageParam.Where(row => !IsDamageParamMatch(row.ID.ToString(), ScramblerData_Core.Static.Boss_EnemyParamID_List)).ToList();
+                LogicComParam = LogicComParam.Where(row => !IsLogicComParamMatch(row.ID.ToString(), ScramblerData_Core.Static.Boss_EnemyParamID_List)).ToList();
+            }
+            if (!c_Enemy_IncludeCharacters)
+            {
+                EnemyParam = EnemyParam.Where(row => !ScramblerData_Core.Static.Character_EnemyParamID_List.Contains(row.ID)).ToList();
+                EnemyMoveParam = EnemyMoveParam.Where(row => !ScramblerData_Core.Static.Character_EnemyParamID_List.Contains(row.ID)).ToList();
+                EnemyDamageParam = EnemyDamageParam.Where(row => !IsDamageParamMatch(row.ID.ToString(), ScramblerData_Core.Static.Character_EnemyParamID_List)).ToList();
+                LogicComParam = LogicComParam.Where(row => !IsLogicComParamMatch(row.ID.ToString(), ScramblerData_Core.Static.Character_EnemyParamID_List)).ToList();
+            }
+            if(!c_Enemy_IncludeSummons)
+            {
+                EnemyParam = EnemyParam.Where(row => !ScramblerData_Core.Static.Summon_Character_EnemyParamID_List.Contains(row.ID)).ToList();
+            }
+            if(!c_Enemy_IncludeHostileCharacters)
+            {
+                EnemyParam = EnemyParam.Where(row => !ScramblerData_Core.Static.Hostile_Character_EnemyParamID_List.Contains(row.ID)).ToList();
+            }
+
+            // Only apply these if a group is actually included
+            if (c_LogicComParam_Detection)
+            {
+                foreach(PARAM.Row row in LogicComParam)
+                {
+                    row["sight_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.AI_Sight_Distance_Min, ScramblerData_Params.Static.EnemyParamData.AI_Sight_Distance_Max);
+                    row["detect_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.AI_Detect_Distance_Min, ScramblerData_Params.Static.EnemyParamData.AI_Detect_Distance_Max);
+                    row["vision_cone_horizontal_angle"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Vision_Cone_Horizontal_Angle_Min, ScramblerData_Params.Static.EnemyParamData.Vision_Cone_Horizontal_Angle_Max);
+                    row["vision_cone_vertical_angle"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Vision_Cone_Vertical_Angle_Min, ScramblerData_Params.Static.EnemyParamData.Vision_Cone_Vertical_Angle_Max);
+                }
+            }
+            if (c_EnemyParam_HP)
+            {
+                foreach (PARAM.Row row in EnemyParam)
+                {
+                    // Boss
+                    if (ScramblerData_Core.Static.Boss_EnemyParamID_List.Contains(row.ID))
+                    {
+                        row["stat_hp"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Boss_HP_Min, ScramblerData_Params.Static.EnemyParamData.Boss_HP_Max);
+                    }
+                    // Enemy
+                    else
+                    {
+                        row["stat_hp"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Enemy_HP_Min, ScramblerData_Params.Static.EnemyParamData.Enemy_HP_Max);
+                    }
+                }
+            }
+            if (c_EnemyParam_Souls)
+            {
+                foreach (PARAM.Row row in EnemyParam)
+                {
+                    // Boss
+                    if (ScramblerData_Core.Static.Boss_EnemyParamID_List.Contains(row.ID))
+                    {
+                        row["souls_held"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Boss_Souls_Min, ScramblerData_Params.Static.EnemyParamData.Boss_Souls_Max);
+                    }
+                    // Enemy
+                    else
+                    {
+                        row["souls_held"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Enemy_Souls_Min, ScramblerData_Params.Static.EnemyParamData.Enemy_Souls_Max);
+                    }
+                }
+            }
+            if (c_EnemyParam_Stamina)
+            {
+                foreach (PARAM.Row row in EnemyParam)
+                {
+                    row["stat_stamina"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Stamina_Min, ScramblerData_Params.Static.EnemyParamData.Stamina_Max);
+                    row["stat_stamina_regen"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Stamina_Regen_Min, ScramblerData_Params.Static.EnemyParamData.Stamina_Regen_Max);
+                }
+            }
+            if (c_EnemyParam_Defence)
+            {
+                foreach (PARAM.Row row in EnemyParam)
+                {
+                    row["defence_physical"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Physical_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Physical_Defence_Max);
+                    row["defence_magic"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Magic_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Magic_Defence_Max);
+                    row["defence_lightning"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Lightning_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Lightning_Defence_Max);
+                    row["defence_fire"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Fire_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Fire_Defence_Max);
+                    row["defence_dark"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Dark_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Dark_Defence_Max);
+                    row["defence_poison"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Poison_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Poison_Defence_Max);
+                    row["defence_bleed"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Bleed_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Bleed_Defence_Max);
+                    row["defence_curse"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Curse_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Curse_Defence_Max);
+                    row["defence_petrify"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Petrify_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Petrify_Defence_Max);
+                }
+            }
+            if (c_EnemyParam_ShieldDefence)
+            {
+                foreach (PARAM.Row row in EnemyParam)
+                {
+                    row["shield_stability"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Stability_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Stability_Max);
+                    row["shield_absorption_physical"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Physical_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Physical_Defence_Max);
+                    row["shield_absorption_magic"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Magic_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Magic_Defence_Max);
+                    row["shield_absorption_lightning"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Lightning_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Lightning_Defence_Max);
+                    row["shield_absorption_fire"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Fire_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Fire_Defence_Max);
+                    row["shield_absorption_dark"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Dark_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Dark_Defence_Max);
+                    row["shield_absorption_poison"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Poison_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Poison_Defence_Max);
+                    row["shield_absorption_bleed"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Bleed_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Bleed_Defence_Max);
+                    row["Unk22"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Curse_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Curse_Defence_Max);
+                    row["Unk23"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Shield_Petrify_Defence_Min, ScramblerData_Params.Static.EnemyParamData.Shield_Petrify_Defence_Max);
+                }
+            }
+            if (c_EnemyParam_Poise)
+            {
+                foreach (PARAM.Row row in EnemyParam)
+                {
+                    row["stat_poise"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Poise_Min, ScramblerData_Params.Static.EnemyParamData.Poise_Max);
+                    row["stat_poise_regen"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Poise_Regen_Min, ScramblerData_Params.Static.EnemyParamData.Poise_Regen_Max);
+                }
+            }
+            if (c_EnemyDamageParam_Damage)
+            {
+                foreach (PARAM.Row row in EnemyDamageParam)
+                {
+                    row["damage_0"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Damage_A_Min, ScramblerData_Params.Static.EnemyParamData.Damage_A_Max);
+
+                    if (rand.Next(100) < ScramblerData_Params.Static.EnemyParamData.Damage_B_Apply_Chance)
+                        row["damage_1"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Damage_B_Min, ScramblerData_Params.Static.EnemyParamData.Damage_B_Max);
+
+                    if (rand.Next(100) < ScramblerData_Params.Static.EnemyParamData.Damage_C_Apply_Chance)
+                        row["damage_2"].Value = GetRandomInt(ScramblerData_Params.Static.EnemyParamData.Damage_C_Min, ScramblerData_Params.Static.EnemyParamData.Damage_C_Max);
+
+                    row["stamina_damage_mult"].Value = GetRandomUShort(ScramblerData_Params.Static.EnemyParamData.Stamina_Damage_Min, ScramblerData_Params.Static.EnemyParamData.Stamina_Damage_Max);
+                }
+            }
+            if (c_EnemyDamageParam_Knockback)
+            {
+                foreach (PARAM.Row row in EnemyDamageParam)
+                {
+                    row["knockback_amount"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Knockback_Amount_Min, ScramblerData_Params.Static.EnemyParamData.Knockback_Amount_Max);
+                    row["knockback_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Knockback_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Knockback_Speed_Max);
+                }
+            }
+            if (c_EnemyDamageParam_AttackSpeed)
+            {
+                foreach (PARAM.Row row in EnemyBehaviorParam)
+                {
+                    row["group_1_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_2_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_3_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_4_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_5_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_6_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_7_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_8_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_9_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_10_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_1_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_2_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_3_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_4_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_5_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_6_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_7_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_8_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_9_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_10_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                }
+                foreach (PARAM.Row row in EnemyBehaviorSecondParam)
+                {
+                    row["group_1_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_2_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_3_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_4_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_5_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_6_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_7_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_8_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_9_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_10_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_1_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_2_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_3_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_4_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_5_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_6_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_7_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_8_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_9_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_10_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                }
+                foreach (PARAM.Row row in EnemyBehaviorThirdParam)
+                {
+                    row["group_1_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_2_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_3_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_4_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_5_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_6_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_7_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_8_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_9_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_10_attack_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Attack_Speed_Max);
+                    row["group_1_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_2_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_3_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_4_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_5_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_6_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_7_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_8_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_9_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                    row["group_10_recovery_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Recovery_Speed_Max);
+                }
+            }
+            if (c_EnemyMoveParam_Walk)
+            {
+                List<PARAM.Row> rows = EnemyMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["walk_acceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Walk_Acceleration_Min, ScramblerData_Params.Static.EnemyParamData.Walk_Acceleration_Max);
+                    row["walk_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Walk_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Walk_Speed_Max);
+                    row["walk_deceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Walk_Deceleration_Min, ScramblerData_Params.Static.EnemyParamData.Walk_Deceleration_Max);
+                    row["lock_on_walk_acceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Walk_LockOn_Acceleration_Min, ScramblerData_Params.Static.EnemyParamData.Walk_LockOn_Acceleration_Max);
+                    row["lock_on_walk_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Walk_LockOn_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Walk_LockOn_Speed_Max);
+                    row["lock_on_walk_deceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Walk_LockOn_Deceleration_Min, ScramblerData_Params.Static.EnemyParamData.Walk_LockOn_Deceleration_Max);
+                }
+            }
+            if (c_EnemyMoveParam_Run)
+            {
+                List<PARAM.Row> rows = EnemyMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["run_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Run_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Run_Speed_Max);
+                    row["run_acceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Run_Acceleration_Min, ScramblerData_Params.Static.EnemyParamData.Run_Acceleration_Max);
+                    row["run_to_walk_deceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Run_Deceleration_Min, ScramblerData_Params.Static.EnemyParamData.Run_Deceleration_Max);
+                    row["lock_on_run_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Run_LockOn_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Run_LockOn_Speed_Max);
+                    row["lock_on_run_acceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Run_LockOn_Acceleration_Min, ScramblerData_Params.Static.EnemyParamData.Run_LockOn_Acceleration_Max);
+                    row["lock_on_run_to_walk_deceleration"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Run_LockOn_Deceleration_Min, ScramblerData_Params.Static.EnemyParamData.Run_LockOn_Deceleration_Max);
+                }
+            }
+            if (c_EnemyMoveParam_Jump)
+            {
+                List<PARAM.Row> rows = EnemyMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["jump_height"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Height_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Height_Max);
+                    row["Unk51"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Unk51_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Unk51_Max);
+                    row["Unk52"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Unk52_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Unk52_Max);
+                    row["jump_length_min"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Length_Minimum_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Length_Minimum_Max);
+                    row["jump_length_max"].Value = ((float)row["jump_length_min"].Value * GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Length_Maximum_Multiplier_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Length_Maximum_Multiplier_Max));
+                    row["Unk53"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Unk53_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Unk53_Max);
+                    row["Unk54"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Unk54_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Unk54_Max);
+                    row["jump_gravity_min"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Gravity_Minimum_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Gravity_Minimum_Max);
+                    row["jump_gravity_max"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Gravity_Maximum_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Gravity_Maximum_Max);
+                    row["Unk55"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Unk55_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Unk55_Max);
+                    row["Unk56"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Unk56_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Unk56_Max);
+                    row["Unk57"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Jump_Unk57_Min, ScramblerData_Params.Static.EnemyParamData.Jump_Unk57_Max);
+
+                    // Adjust these so the player doesn't just die when they jump high
+                    row["fall_distance_breakpoint_1"].Value = ((float)row["jump_height"].Value * 1.2);
+                    row["fall_distance_breakpoint_2"].Value = ((float)row["jump_height"].Value * 1.4);
+                    row["fall_distance_breakpoint_3"].Value = ((float)row["jump_height"].Value * 1.6);
+                    row["fall_distance_max"].Value = ((float)row["jump_height"].Value * 2);
+                }
+            }
+            if (c_EnemyMoveParam_Climb)
+            {
+                List<PARAM.Row> rows = EnemyMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["ladder_climb_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Climb_Ladder_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Climb_Ladder_Speed_Max);
+                    row["ladder_fast_climb_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Climb_Ladder_Fast_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Climb_Ladder_Fast_Speed_Max);
+                    row["ladder_slide_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Climb_Ladder_Slide_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Climb_Ladder_Slide_Speed_Max);
+                    row["Unk107"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Climb_Unk107_Min, ScramblerData_Params.Static.EnemyParamData.Climb_Unk107_Max);
+                    row["Unk108"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Climb_Unk108_Min, ScramblerData_Params.Static.EnemyParamData.Climb_Unk108_Max);
+                }
+            }
+            if (c_EnemyMoveParam_Turn)
+            {
+                List<PARAM.Row> rows = EnemyMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["slow_walk_turn_rate"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Slow_Walk_Turn_Rate_Min, ScramblerData_Params.Static.EnemyParamData.Slow_Walk_Turn_Rate_Max);
+                    row["walk_turn_rate"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Walk_Turn_Rate_Min, ScramblerData_Params.Static.EnemyParamData.Walk_Turn_Rate_Max);
+                    row["Unk08"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Unk08_Turn_Rate_Min, ScramblerData_Params.Static.EnemyParamData.Unk08_Turn_Rate_Max);
+                    row["Unk09"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Unk09_Turn_Rate_Min, ScramblerData_Params.Static.EnemyParamData.Unk09_Turn_Rate_Max);
+                    row["Unk12"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Unk12_Turn_Rate_Min, ScramblerData_Params.Static.EnemyParamData.Unk12_Turn_Rate_Max);
+                    row["Unk13"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Unk13_Turn_Rate_Min, ScramblerData_Params.Static.EnemyParamData.Unk13_Turn_Rate_Max);
+                    row["Unk14"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Unk14_Turn_Rate_Min, ScramblerData_Params.Static.EnemyParamData.Unk14_Turn_Rate_Max);
+                    row["Unk15"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Unk15_Turn_Rate_Min, ScramblerData_Params.Static.EnemyParamData.Unk15_Turn_Rate_Max);
+                    row["lock_on_walk_turn_rate"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Walk_LockOn_Turn_Rate_Min, ScramblerData_Params.Static.EnemyParamData.Walk_LockOn_Turn_Rate_Max);
+                }
+            }
+            if (c_EnemyMoveParam_Evasion)
+            {
+                List<PARAM.Row> rows = EnemyMoveParam;
+
+                foreach (PARAM.Row row in rows)
+                {
+                    row["backstep_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Backstep_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Backstep_Speed_Max);
+                    row["backstep_distance"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Backstep_Distance_Min, ScramblerData_Params.Static.EnemyParamData.Backstep_Distance_Max);
+                    row["roll_speed"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Roll_Speed_Min, ScramblerData_Params.Static.EnemyParamData.Roll_Speed_Max);
+                    row["Unk45"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Unk45_Min, ScramblerData_Params.Static.EnemyParamData.Unk45_Max);
+                    row["Unk47"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Unk47_Min, ScramblerData_Params.Static.EnemyParamData.Unk47_Max);
+                    row["Unk49"].Value = GetRandomFloat(ScramblerData_Params.Static.EnemyParamData.Unk49_Min, ScramblerData_Params.Static.EnemyParamData.Unk49_Max);
+                }
+            }
+
+            return regulation;
+        }
+
+        public bool IsDamageParamMatch(string id, List<int> comparison_list)
+        {
+            bool match = false;
+
+            // Only check if the row ID is within the correct range
+            if (id.Length >= 9)
+            {
+                string truncated_id = id.Substring(1, 4);
+
+                foreach (int row in comparison_list)
+                {
+                    string row_id = row.ToString();
+                    string truncated_row_id = row_id.Substring(0, 4);
+
+                    if (truncated_id == truncated_row_id)
+                        match = true;
+                }
+            }
+
+            return match;
+        }
+
+        public bool IsLogicComParamMatch(string id, List<int> comparison_list)
+        {
+            bool match = false;
+
+            // Only check if the row ID is within the correct range
+            if (id.Length >= 5)
+            {
+                string truncated_id = id.Substring(0, 4);
+
+                foreach (int row in comparison_list)
+                {
+                    string row_id = row.ToString();
+                    string truncated_row_id = row_id.Substring(0, 4);
+
+                    if (truncated_id == truncated_row_id)
+                        match = true;
+                }
+            }
+
+            return match;
         }
     }
 }
