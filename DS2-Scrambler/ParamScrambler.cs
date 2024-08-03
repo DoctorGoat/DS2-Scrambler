@@ -142,10 +142,10 @@ namespace DS2_Scrambler
                     sw.WriteLine("\n\n" + "Row ID:" + row.ID);
 
                     sw.WriteLine("Default base: " + row["base_price"].Value);
-                    var price = (int)row["base_price"].Value * rand.Next(65, 150) / 100;
+                    var price = (int)row["base_price"].Value * rand.Next(80, 120) / 100;
                     row["base_price"].Value = price;
 
-                    price = (int)row["sell_price"].Value * rand.Next(65, 150) / 100;
+                    price = (int)row["sell_price"].Value * rand.Next(80, 120) / 100;
                     sw.WriteLine("Default sale:" + row["sell_price"].Value);
                     sw.WriteLine("Random base price:" + (int)row["base_price"].Value);
                     row["sell_price"].Value = price;
@@ -233,7 +233,7 @@ namespace DS2_Scrambler
                 {
                     sw.WriteLine("!!! WEIGHT !!!!");
                     sw.WriteLine(row.ID);
-                    var weight = (Single)row["weight"].Value * rand.Next(65, 150) / 100;
+                    var weight = (Single)row["weight"].Value * rand.Next(80, 120) / 100;
                     sw.WriteLine("Original weight: " + row["weight"].Value);
                     sw.WriteLine("New weight:" + weight);
                     row["weight"].Value = weight;
@@ -249,8 +249,8 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    sw.WriteLine("!!! Durability! !!!");
-                    var max_durability = (Single)row["max_durability"].Value * rand.Next(65, 150) / 100;
+                    sw.WriteLine("!!! Durability! !!!"); 
+                    var max_durability = (Single)row["max_durability"].Value * rand.Next(80, 120) / 100;
                     sw.WriteLine("ID: " + row.ID + "\nDefault:" + row["max_durability"].Value + "New: ");
                     row["max_durability"].Value = max_durability;
                     Console.Write(row["max_durability"].Value);
@@ -266,7 +266,7 @@ namespace DS2_Scrambler
                 foreach (PARAM.Row row in rows)
                 {
                     sw.WriteLine("ID: " + row.ID + " Default aspd: " + row["animation_speed"].Value);
-                    var animationspeed = (Single)row["animation_speed"].Value * rand.Next(65, 150) / 100;
+                    var animationspeed = (Single)row["animation_speed"].Value * rand.Next(80, 120) / 100;
                     row["animation_speed"].Value = animationspeed;
                     sw.WriteLine("New speed: " + (Single)row["animation_speed"].Value);
                 }
@@ -303,13 +303,13 @@ namespace DS2_Scrambler
                 ).ToList();
 
                 string[] damage = { "stamina_damage", "damage_mult", "stamina_damage_mult", "durability_damage_mult", "status_effect_amount", "posture_damage_mult", "hitback_radius", "hitback_length" };
-
+ 
                 foreach (PARAM.Row row in rows)
                 {
                     foreach (string s in damage)
                     {
                         sw.WriteLine(row.ID + " initial values for :" + s + ": " + row[s].Value);
-                        var dmg = (Single)row[s].Value * rand.Next(65, 150) / 100;
+                        var dmg = (Single)row[s].Value * rand.Next(80, 120) / 100;
                         row[s].Value = dmg;
                         sw.WriteLine(row.ID + " final values:" + row[s].Value);
                     }
@@ -343,7 +343,7 @@ namespace DS2_Scrambler
                         sw.WriteLine("Random growth: " + growth);
                         sw.WriteLine(s + " default: " + row[s].Value);
                         sw.WriteLine(s + " default max: " + row["max_" + s].Value);
-                        if (rand.Next(0, 5) >= 4)
+                        if (rand.Next(0,5) == 5)
                         {
                             if (Convert.ToSingle(row[s].Value) == 0)
                             {
@@ -352,9 +352,9 @@ namespace DS2_Scrambler
                                 sw.WriteLine("New value for " + s + ": " + row[s].Value);
                             }
                         }
-                        var value = (Single)row[s].Value * (rand.Next(70, 130) / 100);
+                        var value = (Single)row[s].Value * (rand.Next(50, 120)) / 100;
                         row[s].Value = value;
-                        sw.WriteLine("New value for " + s + ":");
+                        sw.WriteLine("New value for " + s + ":" + value);
                         row["max_" + s].Value = value * growth;
                         sw.WriteLine("New value for " + "max_" + s + ": " + row["max_" + s].Value);
                     }
@@ -400,7 +400,7 @@ namespace DS2_Scrambler
                     foreach (string s in base_abs)
                     {
                         sw.WriteLine("Original absorption for " + s + ": " + row[s].Value);
-                        var absorp = (Single)row[s].Value * rand.Next(60, 140) / 100;
+                        var absorp = (Single)row[s].Value * rand.Next(50, 150) / 100;
                         row[s].Value = absorp;
                         sw.WriteLine("Final absorption for " + s + ": " + row[s].Value);
                     }
@@ -553,21 +553,21 @@ namespace DS2_Scrambler
                row.ID <= ScramblerData_Items.Static.ArmorParam_Category_End
                ).ToList();
 
-                sw.WriteLine("!!!   ARMOR_PRICES:   !!!");
-                foreach (PARAM.Row row in rows)
-                {
-                    sw.WriteLine("\n\n" + "Row ID:" + row.ID);
+                    sw.WriteLine("!!!   ARMOR_PRICES:   !!!");
+                    foreach (PARAM.Row row in rows)
+                    {
+                        sw.WriteLine("\n\n" + "Row ID:" + row.ID);
 
-                    sw.WriteLine("Default base: " + row["base_price"].Value);
-                    var price = (int)row["base_price"].Value * rand.Next(65, 150) / 100;
-                    row["base_price"].Value = price;
+                        sw.WriteLine("Default base: " + row["base_price"].Value);
+                        var price = (int)row["base_price"].Value * rand.Next(80, 120) / 100;
+                        row["base_price"].Value = price;
 
-                    price = (int)row["sell_price"].Value * rand.Next(65, 150) / 100;
-                    sw.WriteLine("Default sale:" + row["sell_price"].Value);
-                    sw.WriteLine("Random base price:" + (int)row["base_price"].Value);
-                    row["sell_price"].Value = price;
-                    sw.WriteLine("Random sell price:" + row["sell_price"].Value);
-                }
+                        price = (int)row["sell_price"].Value * rand.Next(80, 120) / 100;
+                        sw.WriteLine("Default sale:" + row["sell_price"].Value);
+                        sw.WriteLine("Random base price:" + (int)row["base_price"].Value);
+                        row["sell_price"].Value = price;
+                        sw.WriteLine("Random sell price:" + row["sell_price"].Value);
+                    }
             }
             if (c_ItemParam_Armor_Effect)
             {
@@ -649,7 +649,7 @@ namespace DS2_Scrambler
                 {
                     sw.WriteLine("!!! WEIGHT !!!!");
                     sw.WriteLine(row.ID);
-                    var weight = (Single)row["weight"].Value * rand.Next(65, 150) / 100;
+                    var weight = (Single)row["weight"].Value * rand.Next(80, 120) / 100;
                     sw.WriteLine("Original weight: " + row["weight"].Value);
                     sw.WriteLine("New weight:" + weight);
                     row["weight"].Value = weight;
@@ -665,7 +665,7 @@ namespace DS2_Scrambler
                 foreach (PARAM.Row row in rows)
                 {
                     sw.WriteLine("!!! Durability! !!!");
-                    var durability = (Single)row["durability"].Value * rand.Next(65, 150) / 100;
+                    var durability = (Single)row["durability"].Value * rand.Next(80, 120) / 100;
                     sw.WriteLine("ID: " + row.ID + "\nDefault:" + row["durability"].Value);
                     row["durability"].Value = durability;
                     Console.WriteLine("Final:" + row["durability"].Value);
@@ -709,21 +709,21 @@ namespace DS2_Scrambler
                 }
             }
 
-            if (c_ArmorParam_Poise)
-            {
-                List<PARAM.Row> rows = ArmorParam.Where(row =>
-                row.ID >= 11010100 &&
-                row.ID <= 17950103
-                ).ToList();
+                if (c_ArmorParam_Poise)
+                {                
+                    List<PARAM.Row> rows = ArmorParam.Where(row =>
+                    row.ID >= 11010100 &&
+                    row.ID <= 17950103
+                    ).ToList();
 
-                foreach (PARAM.Row row in rows)
-                {
-                    sw.WriteLine("!!! Poise !!!!");
-                    sw.WriteLine(row.ID);
-                    var weight = (Single)row["poise"].Value * rand.Next(65, 150) / 100;
-                    sw.WriteLine("Original poise: " + row["poise"].Value);
-                    row["poise"].Value = weight;
-                    sw.WriteLine("New poise: " + row["poise"].Value);
+                    foreach (PARAM.Row row in rows)
+                    {
+                        sw.WriteLine("!!! Poise !!!!");
+                        sw.WriteLine(row.ID);
+                        var weight = (Single)row["poise"].Value * rand.Next(80, 120) / 100;
+                        sw.WriteLine("Original poise: " + row["poise"].Value);
+                        row["poise"].Value = weight;
+                        sw.WriteLine("New poise: " + row["poise"].Value);
                 }
             }
 
@@ -741,7 +741,7 @@ namespace DS2_Scrambler
 
                     string[] defence = { "_slash", "_thrust", "_strike", "_standard" };
                     string[] absorp = { "_poison", "_petrify", "_bleed", "_curse", "_magic", "_fire", "_dark", "_lightning" };
-                    foreach (string s in defence)
+                    foreach(string s in defence)
                     {
                         sw.WriteLine(s);
                         sw.WriteLine("Original value:" + row["defence" + s].Value);
@@ -753,7 +753,7 @@ namespace DS2_Scrambler
                         sw.WriteLine("New max value:" + row["max_defence" + s].Value);
                     }
 
-                    foreach (string s in absorp)
+                    foreach(string s in absorp)
                     {
                         sw.WriteLine(s);
                         sw.WriteLine("Original value:" + row["absorption" + s].Value);
@@ -904,7 +904,7 @@ namespace DS2_Scrambler
                     row["durability"].Value = (float)GetRandomInt(ScramblerData_Params.Static.RingParamData.Durability_Min, ScramblerData_Params.Static.RingParamData.Durability_Max);
                 }
             }
-
+            
             return regulation;
         }
         public Regulation Scramble_ItemAttributes(
@@ -1039,7 +1039,7 @@ namespace DS2_Scrambler
                     }
                 }
             }
-
+            
             return regulation;
         }
 
