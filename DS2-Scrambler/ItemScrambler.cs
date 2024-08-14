@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -97,7 +97,6 @@ namespace DS2_Scrambler
                     ScrambleEventRewards(Data.Itemlot_List_Event_Rewards);
                 }
 
-                ScrambleMapLoot(Data.Itemlot_List_Things_Betwixt);
                 ScrambleMapLoot(Data.Itemlot_List_Majula);
                 ScrambleMapLoot(Data.Itemlot_List_Forest_of_Fallen_Giants);
                 ScrambleMapLoot(Data.Itemlot_List_Brightstone_Cove_Tseldora);
@@ -957,37 +956,28 @@ namespace DS2_Scrambler
             UpdateSecondStageShopEntries(Data.Shoplot_List_Carhillion_InitialStage, Data.Shoplot_List_Carhillion_SecondStage);
             UpdateSecondStageShopEntries(Data.Shoplot_List_Licia_InitialStage, Data.Shoplot_List_Licia_SecondStage);
 
+            int[] items = { 60538000, 60350000, 60530000, 50960000, 60970000 };
             if (T_Ensure_Lifegems)
             {
-                Random rand = new Random();
-                int roll = rand.Next(100);
-
-                // Melentia
-                if (roll >= 0 && roll < 33)
+                List<PARAM.Row> rows = Data.Shoplot_List_Shalquoir.ToList();
+                for (int i = 0; i < items.Length; i++)
                 {
-                    List<PARAM.Row> rows = Data.Shoplot_List_Melentia.Where(row => row.ID == 75400600).ToList();
-                    rows[0]["equip_id"].Value = 60010000;
-                    rows[0]["quantity"].Value = 255;
-                }
-
-                // Felkin
-                if (roll >= 33 && roll < 66)
-                {
-                    List<PARAM.Row> rows = Data.Shoplot_List_Felkin.Where(row => row.ID == 77000600).ToList();
-                    rows[0]["equip_id"].Value = 60010000;
-                    rows[0]["quantity"].Value = 255;
-                }
-
-                // Shalquior
-                if (roll >= 66)
-                {
-                    List<PARAM.Row> rows = Data.Shoplot_List_Shalquoir.Where(row => row.ID == 77700402).ToList();
-                    rows[0]["equip_id"].Value = 60010000;
-                    rows[0]["quantity"].Value = 255;
+                    PARAM.Row newItem = rows[1];
+                    newItem.ID = 77700608 + i;
+                    newItem["enable_flag"].Value = -1;
+                    newItem["equip_id"].Value = items[i];
+                    AddItemToShoplot(newItem, rows, 254, 255);
+//                    rows = appendItem(rows, items[i], 255, i);
                 }
             }
         }
 
+        public List<PARAM.Row> appendItem(List<PARAM.Row> rows, int toAdd, int quantity, int pos)
+        {
+
+//            rows.Add(item);
+            return rows;
+        }
         public void UpdateSecondStageShopEntries(List<PARAM.Row> initialShopRows, List<PARAM.Row> secondShopRows)
         {
             // Update second stage shop
