@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -732,14 +732,8 @@ namespace DS2_Scrambler
         public int Durability_Max { get; set; }
         public float Animation_Speed_Min { get; set; }
         public float Animation_Speed_Max { get; set; }
-        public short STR_Requirement_Min { get; set; }
-        public short STR_Requirement_Max { get; set; }
-        public short DEX_Requirement_Min { get; set; }
-        public short DEX_Requirement_Max { get; set; }
-        public short INT_Requirement_Min { get; set; }
-        public short INT_Requirement_Max { get; set; }
-        public short FTH_Requirement_Min { get; set; }
-        public short FTH_Requirement_Max { get; set; }
+        public short Stat_Requirement_Min { get; set; }
+        public short Stat_Requirement_Max { get; set; }
 
         public float Stamina_Damage_Min { get; set; }
         public float Stamina_Damage_Max { get; set; }
@@ -756,7 +750,7 @@ namespace DS2_Scrambler
         public float Counter_Damage_Multiplier_Min { get; set; }
         public float Counter_Damage_Multiplier_Max { get; set; }
 
-        public float Physical_Damage_Min { get; set; }
+        public float Damage_Min { get; set; }
         public float Physical_Damage_Max { get; set; }
         public float Magic_Damage_Min { get; set; }
         public float Magic_Damage_Max { get; set; }
@@ -815,6 +809,10 @@ namespace DS2_Scrambler
         public byte Arrow_Poison_Damage_Max { get; set; }
         public byte Arrow_Bleed_Damage_Min { get; set; }
         public byte Arrow_Bleed_Damage_Max { get; set; }
+        public int RandCount { get; internal set; }
+        public double Damage_Max { get; internal set; }
+        public float Shield_Absorption_Factor_Min { get; set; }
+        public float Shield_Absorption_Factor_Max { get; set; }
     }
     public class ParamData_Armor
     {
