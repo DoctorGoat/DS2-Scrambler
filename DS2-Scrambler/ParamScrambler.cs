@@ -1,4 +1,5 @@
 using SoulsFormats;
+using System.Text;
 
 namespace DS2_Scrambler
 {
@@ -30,6 +31,7 @@ namespace DS2_Scrambler
                 list[n] = value;
             }
         }
+
     }
 
     // TODO: add new scramble type: Scalar, that scales the existing value instead of generating a new value. This will be a selection box in actions. Existing will be called Generated
@@ -249,7 +251,7 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    sw.WriteLine("!!! Durability! !!!"); 
+                    sw.WriteLine("!!! Durability! !!!");
                     var max_durability = (Single)row["max_durability"].Value * rand.Next(80, 120) / 100;
                     sw.WriteLine("ID: " + row.ID + "\nDefault:" + row["max_durability"].Value + "New: ");
                     row["max_durability"].Value = max_durability;
@@ -303,7 +305,7 @@ namespace DS2_Scrambler
                 ).ToList();
 
                 string[] damage = { "stamina_damage", "damage_mult", "stamina_damage_mult", "durability_damage_mult", "status_effect_amount", "posture_damage_mult", "hitback_radius", "hitback_length" };
- 
+
                 foreach (PARAM.Row row in rows)
                 {
                     foreach (string s in damage)
@@ -333,26 +335,41 @@ namespace DS2_Scrambler
                 foreach (PARAM.Row row in rows)
                 {
                     // Damage
-
+                    // Lots to do here.
+                    // And I don't think it works right now. 
                     sw.WriteLine("Row ID" + row.ID);
+                    sw.WriteLine("Row name:" + row.Name);
+
                     string[] damage = { "damage_physical", "damage_magic", "damage_lightning", "damage_dark", "damage_fire", "damage_poison", "damage_bleed" };
+                    //Set this to 6 or something to skip this segment.
+                    if(rand.Next(0,5) >= 4)
+                    {
+                        int dmgtype1 = 0;
+                        sw.WriteLine(row[damage[dmgtype1]]);
+                        var swap = damage[dmgtype1];
+                        int dmgtype2 = rand.Next(0, 4);
+                        row["max_" + damage[dmgtype1]].Value = row["max_" + damage[dmgtype2]].Value;
+                        damage[dmgtype1] = damage[dmgtype2];
+                        damage[dmgtype1] = swap;
+                        while(rand.Next(0,10) >= 9)
+                        {
+                            int rnd = rand.Next(0, 4);
+                            sw.WriteLine("Jackpot!");
+                            var split = (float)row[damage[rnd]].Value * ((rand.NextDouble() + 0.75));
+                            row[damage[rnd]].Value = (float)row[damage[rnd]].Value * split;
+                            sw.WriteLine(split + "applied to " + damage[rnd] + " this.");
+                        }
+                        row["max_" + damage[dmgtype1]].Value = row[damage[dmgtype2]].Value;
+                    }
+
+                    //This part definitely works. 
                     foreach (string s in damage)
                     {
-
-                        float growth = GetRandomFloat(1.0, 2.5);
+                        float growth = GetRandomFloat(1.3, 2.5);
                         sw.WriteLine("Random growth: " + growth);
                         sw.WriteLine(s + " default: " + row[s].Value);
                         sw.WriteLine(s + " default max: " + row["max_" + s].Value);
-                        if (rand.Next(0,5) == 5)
-                        {
-                            if (Convert.ToSingle(row[s].Value) == 0)
-                            {
-                                sw.WriteLine("Random achieved, adding 1-200 damage to a formerly empty stat.");
-                                row[s].Value = (Single)rand.Next(1, 200);
-                                sw.WriteLine("New value for " + s + ": " + row[s].Value);
-                            }
-                        }
-                        var value = (Single)row[s].Value * (rand.Next(50, 120)) / 100;
+                        var value = (Single)row[s].Value * rand.Next(100, 130) / 100;
                         row[s].Value = value;
                         sw.WriteLine("New value for " + s + ":" + value);
                         row["max_" + s].Value = value * growth;
@@ -369,7 +386,7 @@ namespace DS2_Scrambler
                         for (int i = 1; i < 10; i++)
                         {
                             sw.WriteLine("Original stability_" + i + ":" + row["stability_" + i].Value);
-                            row["stability_" + i].Value = (stability * rand.Next(95, 120) / 100 * i);
+                            row["stability_" + i].Value = (stability * ((rand.Next(95, 120) / 100) * i));
                             if ((float)row["stability_" + i].Value > 100)
                             {
                                 row["stability_" + i].Value = 100;
@@ -379,17 +396,10 @@ namespace DS2_Scrambler
                     }
                     else
                     {
-                        row["stability_0"].Value = stability;
-                        row["stability_1"].Value = stability;
-                        row["stability_2"].Value = stability;
-                        row["stability_3"].Value = stability;
-                        row["stability_4"].Value = stability;
-                        row["stability_5"].Value = stability;
-                        row["stability_6"].Value = stability;
-                        row["stability_7"].Value = stability;
-                        row["stability_8"].Value = stability;
-                        row["stability_9"].Value = stability;
-                        row["stability_10"].Value = stability;
+                        for(int i = 0; i <= 10; i++)
+                        {
+                            row["stability_" + i].Value = stability;
+                        }
                     }
 
                     string[] base_abs = { "absorption_physical", "absorption_magic", "absorption_lightning", "absorption_dark", "absorption_poison", "absorption_bleed", "absorption_petrify", "absorption_curse" };
@@ -400,7 +410,7 @@ namespace DS2_Scrambler
                     foreach (string s in base_abs)
                     {
                         sw.WriteLine("Original absorption for " + s + ": " + row[s].Value);
-                        var absorp = (Single)row[s].Value * rand.Next(50, 150) / 100;
+                        var absorp = (Single)row[s].Value * rand.Next(75, 125) / 100;
                         row[s].Value = absorp;
                         sw.WriteLine("Final absorption for " + s + ": " + row[s].Value);
                     }
@@ -445,7 +455,8 @@ namespace DS2_Scrambler
 
                 foreach (PARAM.Row row in rows)
                 {
-                    if ((ushort)row["damage_physical"].Value > 0)
+                    //TODO: walk over this and make it cascade/have a luck system. 
+                    if ((ushort)row["damage_physical"].Value > 0 )
                         row["damage_physical"].Value = GetRandomUShort(ScramblerData_Params.Static.WeaponParamData.Arrow_Physical_Damage_Min, ScramblerData_Params.Static.WeaponParamData.Arrow_Physical_Damage_Max);
 
                     if ((ushort)row["damage_magic"].Value > 0)
@@ -681,7 +692,7 @@ namespace DS2_Scrambler
                 foreach (PARAM.Row row in rows)
                 {
                     sw.WriteLine("Original armor scaling:" + row["physical_defence_scaling"].Value);
-                    var physdefscale = (Single)row["physical_defence_scaling"].Value * rand.Next(25, 500) / 100;
+                    var physdefscale = (Single)row["physical_defence_scaling"].Value * rand.Next(90, 110) / 100;
                     row["physical_defence_scaling"].Value = physdefscale;
                     sw.WriteLine("New armor scaling:" + row["physical_defence_scaling"].Value);
                 }
@@ -745,11 +756,11 @@ namespace DS2_Scrambler
                     {
                         sw.WriteLine(s);
                         sw.WriteLine("Original value:" + row["defence" + s].Value);
-                        var tempvar = (Single)row["defence" + s].Value * rand.Next(90, 150) / 100;
+                        var tempvar = (Single)row["defence" + s].Value * rand.Next(90, 110) / 100;
                         row["defence" + s].Value = tempvar;
                         sw.WriteLine("New value:" + row["defence" + s].Value);
                         sw.WriteLine("Original max value:" + row["max_defence" + s].Value);
-                        row["max_defence" + s].Value = tempvar * rand.Next(120, 200) / 100;
+                        row["max_defence" + s].Value = tempvar * rand.Next(120, 150) / 100;
                         sw.WriteLine("New max value:" + row["max_defence" + s].Value);
                     }
 
@@ -761,7 +772,7 @@ namespace DS2_Scrambler
                         row["absorption" + s].Value = tempvar;
                         sw.WriteLine("New value:" + row["absorption" + s].Value);
                         sw.WriteLine("Original max value:" + row["max_absorption" + s].Value);
-                        row["max_absorption" + s].Value = tempvar * rand.Next(120, 200) / 100;
+                        row["max_absorption" + s].Value = tempvar * rand.Next(90, 130) / 100;
                         sw.WriteLine("New max value:" + row["max_absorption" + s].Value);
 
                     }
